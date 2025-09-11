@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+// Cambia esta IP si accedes desde otro dispositivo o red
+const API_BASE_URL = 'http://localhost:5000/api'; // Ejemplo: 'http://192.168.0.100:5000/api'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -23,12 +24,18 @@ api.interceptors.request.use(
   }
 );
 
+
 export const authAPI = {
   login: (credentials) => api.post('/login', credentials),
+  changePassword: (data) => api.post('/change-password', data),
+  getUsers: () => api.get('/users'),
+  createUser: (data) => api.post('/users', data),
+  toggleUser: (id) => api.post(`/users/${id}/toggle`),
+  deleteUser: (id) => api.delete(`/users/${id}`),
 };
 
 export const dashboardAPI = {
-  getData: () => api.get('/dashboard'),
+  getData: (username) => api.post('/dashboard', { username }),
   getRoutes: () => api.get('/routes'),
 };
 

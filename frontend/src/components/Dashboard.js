@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardAPI } from '../utils/api';
+import { dashboardAPI, authAPI } from '../utils/api';
+import UserCrud from './UserCrud';
 import './Dashboard.css';
 
 const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('inicio');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -16,9 +18,9 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await dashboardAPI.getData();
-      
-      if (response.data.success) {
+      const username = localStorage.getItem('username');
+      const response = await dashboardAPI.getData(username);
+      if (response.data.success && response.data.data) {
         setDashboardData(response.data.data);
       } else {
         setError('Error al cargar los datos');
@@ -33,6 +35,7 @@ const Dashboard = () => {
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('username');
+    localStorage.removeItem('role');
     navigate('/login');
   };
 
@@ -77,132 +80,131 @@ const Dashboard = () => {
             </button>
           </div>
         </div>
-        
         <nav className="dashboard-nav">
-          <a href="#inicio" className="nav-item active">Inicio</a>
-          <a href="#rutas" className="nav-item">Rutas</a>
+          <a href="#inicio" className={`nav-item${activeTab === 'inicio' ? ' active' : ''}`} onClick={() => setActiveTab('inicio')}>Inicio</a>
+          <a href="#usuarios" className={`nav-item${activeTab === 'usuarios' ? ' active' : ''}`} onClick={() => setActiveTab('usuarios')}>Usuarios</a>
+          <a href="#rutas" className={`nav-item${activeTab === 'rutas' ? ' active' : ''}`} onClick={() => setActiveTab('rutas')}>Rutas</a>
           <a href="#pedidos" className="nav-item">Pedidos</a>
           <a href="#inventario" className="nav-item">Inventario</a>
           <a href="#indicadores" className="nav-item">Indicadores (KPIs)</a>
           <a href="#configuracion" className="nav-item">Configuración</a>
         </nav>
       </header>
-
       {/* Main Content */}
       <main className="dashboard-content">
-        {/* Metrics Grid */}
-        <div className="metrics-grid">
-          <div className="metric-card">
-            <div className="metric-icon">🚚</div>
-            <div className="metric-info">
-              <h3>Entregas a tiempo</h3>
-              <div className="metric-value">{dashboardData.on_time_delivery}%</div>
-            </div>
-          </div>
-          
-          <div className="metric-card">
-            <div className="metric-icon">⏱️</div>
-            <div className="metric-info">
-              <h3>Promedio de entrega</h3>
-              <div className="metric-value">{dashboardData.avg_delivery_time} min</div>
-            </div>
-          </div>
-          
-          <div className="metric-card">
-            <div className="metric-icon">⛽</div>
-            <div className="metric-info">
-              <h3>Consumo de combustible</h3>
-              <div className="metric-value">{dashboardData.fuel_consumption}L</div>
-            </div>
-          </div>
-          
-          <div className="metric-card">
-            <div className="metric-icon">📊</div>
-            <div className="metric-info">
-              <h3>Kilometraje por ruta</h3>
-              <div className="metric-value">{dashboardData.mileage_per_route} km</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Charts Section */}
-        <div className="charts-section">
-          <div className="chart-card">
-            <h3>Rendimiento semanal</h3>
-            <div className="bar-chart">
-              {dashboardData.weekly_performance.map((value, index) => (
-                <div key={index} className="bar-container">
-                  <div 
-                    className="bar" 
-                    style={{ height: `${value}%` }}
-                    title={`${value}%`}
-                  ></div>
-                  <span className="bar-label">
-                    {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][index]}
-                  </span>
+        {activeTab === 'usuarios' ? (
+          <UserCrud />
+        ) : (
+          <>
+            {/* Metrics Grid */}
+            <div className="metrics-grid">
+              <div className="metric-card">
+                <div className="metric-icon">🚚</div>
+                <div className="metric-info">
+                  <h3>Entregas a tiempo</h3>
+                  <div className="metric-value">{dashboardData.on_time_delivery}%</div>
                 </div>
-              ))}
-            </div>
-          </div>
-          
-          <div className="chart-card">
-            <h3>Comparación de rutas</h3>
-            <div className="routes-comparison">
-              {dashboardData.route_comparison.map((route, index) => (
-                <div key={index} className="route-item">
-                  <span className="route-name">{route.name}</span>
-                  <div className="efficiency-bar">
-                    <div 
-                      className="efficiency-fill"
-                      style={{ width: `${route.efficiency}%` }}
-                    ></div>
-                  </div>
-                  <span className="efficiency-value">{route.efficiency}%</span>
+              </div>
+              <div className="metric-card">
+                <div className="metric-icon">⏱️</div>
+                <div className="metric-info">
+                  <h3>Promedio de entrega</h3>
+                  <div className="metric-value">{dashboardData.avg_delivery_time} min</div>
                 </div>
-              ))}
+              </div>
+              <div className="metric-card">
+                <div className="metric-icon">⛽</div>
+                <div className="metric-info">
+                  <h3>Consumo de combustible</h3>
+                  <div className="metric-value">{dashboardData.fuel_consumption}L</div>
+                </div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-icon">📊</div>
+                <div className="metric-info">
+                  <h3>Kilometraje por ruta</h3>
+                  <div className="metric-value">{dashboardData.mileage_per_route} km</div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-
-        {/* Delivery Status */}
-        <div className="delivery-status-card">
-          <h3>Estado de entregas</h3>
-          <div className="delivery-table-container">
-            <table className="delivery-table">
-              <thead>
-                <tr>
-                  <th>Ruta</th>
-                  <th>Estado</th>
-                  <th>Hora</th>
-                  <th>Ruta</th>
-                  <th>Estado</th>
-                  <th>Hora</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dashboardData.delivery_status.map((delivery, index) => (
-                  <tr key={index}>
-                    <td>{delivery.route}</td>
-                    <td>
-                      <span className={getStatusClass(delivery.status)}>
-                        {delivery.status}
+            {/* Charts Section */}
+            <div className="charts-section">
+              <div className="chart-card">
+                <h3>Rendimiento semanal</h3>
+                <div className="bar-chart">
+                  {dashboardData.weekly_performance.map((value, index) => (
+                    <div key={index} className="bar-container">
+                      <div 
+                        className="bar" 
+                        style={{ height: `${value}%` }}
+                        title={`${value}%`}
+                      ></div>
+                      <span className="bar-label">
+                        {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][index]}
                       </span>
-                    </td>
-                    <td>{delivery.time}</td>
-                    {/* Segunda columna con datos similares */}
-                    <td>{delivery.route}</td>
-                    <td>
-                      <span className={getStatusClass(delivery.status)}>
-                        {delivery.status}
-                      </span>
-                    </td>
-                    <td>{delivery.time}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="chart-card">
+                <h3>Comparación de rutas</h3>
+                <div className="routes-comparison">
+                  {dashboardData.route_comparison.map((route, index) => (
+                    <div key={index} className="route-item">
+                      <span className="route-name">{route.name}</span>
+                      <div className="efficiency-bar">
+                        <div 
+                          className="efficiency-fill"
+                          style={{ width: `${route.efficiency}%` }}
+                        ></div>
+                      </div>
+                      <span className="efficiency-value">{route.efficiency}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {/* Delivery Status */}
+            <div className="delivery-status-card">
+              <h3>Estado de entregas</h3>
+              <div className="delivery-table-container">
+                <table className="delivery-table">
+                  <thead>
+                    <tr>
+                      <th>Ruta</th>
+                      <th>Estado</th>
+                      <th>Hora</th>
+                      <th>Ruta</th>
+                      <th>Estado</th>
+                      <th>Hora</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboardData.delivery_status.map((delivery, index) => (
+                      <tr key={index}>
+                        <td>{delivery.route}</td>
+                        <td>
+                          <span className={getStatusClass(delivery.status)}>
+                            {delivery.status}
+                          </span>
+                        </td>
+                        <td>{delivery.time}</td>
+                        {/* Segunda columna con datos similares */}
+                        <td>{delivery.route}</td>
+                        <td>
+                          <span className={getStatusClass(delivery.status)}>
+                            {delivery.status}
+                          </span>
+                        </td>
+                        <td>{delivery.time}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
