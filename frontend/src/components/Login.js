@@ -180,7 +180,12 @@ const Login = () => {
           </form>
         )}
         <div className="login-footer">
-          <p>¿Necesitas ayuda? Contacta al administrador</p>
+          <p>
+            <a href="/forgot-password" style={{ color: '#3498db', textDecoration: 'underline', fontWeight: 500 }}>
+              ¿Olvidaste tu contraseña?
+            </a>
+          </p>
+          <p style={{ marginTop: 8 }}>¿Necesitas ayuda? Contacta al administrador</p>
         </div>
       </div>
     </div>

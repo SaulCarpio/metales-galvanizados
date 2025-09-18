@@ -80,16 +80,16 @@ const Dashboard = () => {
             </button>
           </div>
         </div>
-        <nav className="dashboard-nav">
-          <a href="#inicio" className={`nav-item${activeTab === 'inicio' ? ' active' : ''}`} onClick={() => setActiveTab('inicio')}>Inicio</a>
-          <a href="#usuarios" className={`nav-item${activeTab === 'usuarios' ? ' active' : ''}`} onClick={() => setActiveTab('usuarios')}>Usuarios</a>
-          <a href="#rutas" className={`nav-item${activeTab === 'rutas' ? ' active' : ''}`} onClick={() => setActiveTab('rutas')}>Rutas</a>
-          <a href="#pedidos" className="nav-item">Pedidos</a>
-          <a href="#inventario" className="nav-item">Inventario</a>
-          <a href="#indicadores" className="nav-item">Indicadores (KPIs)</a>
-          <a href="#configuracion" className="nav-item">Configuración</a>
-        </nav>
       </header>
+      <nav className="dashboard-nav">
+        <a href="#inicio" className={`nav-item${activeTab === 'inicio' ? ' active' : ''}`} onClick={() => setActiveTab('inicio')}>Inicio</a>
+        <a href="#usuarios" className={`nav-item${activeTab === 'usuarios' ? ' active' : ''}`} onClick={() => setActiveTab('usuarios')}>Usuarios</a>
+        <a href="#rutas" className={`nav-item${activeTab === 'rutas' ? ' active' : ''}`} onClick={() => setActiveTab('rutas')}>Rutas</a>
+        <a href="#pedidos" className="nav-item">Pedidos</a>
+        <a href="#inventario" className="nav-item">Inventario</a>
+        <a href="#indicadores" className="nav-item">Indicadores (KPIs)</a>
+        <a href="#configuracion" className="nav-item">Configuración</a>
+      </nav>
       {/* Main Content */}
       <main className="dashboard-content">
         {activeTab === 'usuarios' ? (

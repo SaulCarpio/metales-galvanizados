@@ -5,6 +5,7 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import MapView from './components/MapView';
 import AccessDenied from './components/AccessDenied';
+import ForgotPassword from './components/ForgotPassword';
 import './App.css';
 
 function App() {
@@ -42,6 +43,7 @@ function App() {
       <div className="App">
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route 
             path="/dashboard" 
             element={

@@ -13,20 +13,22 @@ const MapView = () => {
   };
 
   return (
-    <div style={{ width: '100%', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
-      <div style={{ width: '100%', padding: '20px', background: '#3498db', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', margin: 0, padding: 0 }}>
+      <div style={{ width: '100%', padding: '20px', background: '#3498db', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: '0 0 auto' }}>
         <span>Bienvenido, {username}</span>
-        <button onClick={handleLogout} style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer', fontWeight: 'bold' }}>Cerrar sesión</button>
+        <button onClick={handleLogout} style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.97rem', minWidth: '80px', maxWidth: '120px' }}>Cerrar sesión</button>
       </div>
-      <iframe
-        title="OpenStreetMap"
-        width="100%"
-        height="500"
-        frameBorder="0"
-        src="https://www.openstreetmap.org/export/embed.html"
-        style={{ border: 0 }}
-        allowFullScreen
-      ></iframe>
+      <div style={{ flex: 1, width: '100%', height: '100%', minHeight: 0 }}>
+        <iframe
+          title="OpenStreetMap"
+          width="100%"
+          height="100%"
+          frameBorder="0"
+          src="https://www.openstreetmap.org/export/embed.html?bbox=-70.0,-23.0,-57.0,-9.0&layer=mapnik"
+          style={{ border: 0, width: '100%', height: '100%' }}
+          allowFullScreen
+        ></iframe>
+      </div>
     </div>
   );
 };

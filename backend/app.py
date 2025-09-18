@@ -2,19 +2,23 @@
 
 
 
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail, Message
-from datetime import datetime
 from dotenv import load_dotenv
 import os
 import random
 import string
-from models import db, User, Role
+from models import db, User, Role, CodigosVerificacion
+from flask_bcrypt import Bcrypt
+import datetime
+
 
 load_dotenv()
 app = Flask(__name__)
+bcrypt = Bcrypt(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
@@ -44,32 +48,30 @@ def create_tables():
     with app.app_context():
         db.create_all()
         # Crear roles y usuarios iniciales si no existen
-        if not Role.query.filter_by(name='admin').first():
-            admin_role = Role(name='admin')
-            user_role = Role(name='usuario')
+        if not Role.query.filter_by(nombre='admin').first():
+            admin_role = Role(nombre='admin')
+            user_role = Role(nombre='usuario')
             db.session.add(admin_role)
             db.session.add(user_role)
             db.session.commit()
-        if not User.query.filter_by(username='app.megacero').first():
+        if not User.query.filter_by(nombre='app.megacero').first():
             admin = User(
-                username='app.megacero',
+                nombre='app.megacero',
                 email='admin@megacero.com',
-                password='qwerty12345',
-                role_id=Role.query.filter_by(name='admin').first().id,
-                is_active=True,
-                temp_password=False
+                rol_id=Role.query.filter_by(nombre='admin').first().id,
+                activo=True
             )
+            admin.set_password('qwerty12345')
             db.session.add(admin)
             db.session.commit()
-        if not User.query.filter_by(username='usuario.megacero').first():
+        if not User.query.filter_by(nombre='usuario.megacero').first():
             user = User(
-                username='usuario.megacero',
+                nombre='usuario.megacero',
                 email='usuario@megacero.com',
-                password='usuario123',
-                role_id=Role.query.filter_by(name='usuario').first().id,
-                is_active=True,
-                temp_password=False
+                rol_id=Role.query.filter_by(nombre='usuario').first().id,
+                activo=True
             )
+            user.set_password('usuario123')
             db.session.add(user)
             db.session.commit()
 
@@ -78,13 +80,18 @@ def login():
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
-    user = User.query.filter_by(username=username).first()
-    if not user or not user.is_active:
+    user = User.query.filter_by(nombre=username).first()
+    if not user or not user.activo:
         return jsonify({'success': False, 'message': 'Usuario no existe o está deshabilitado'}), 401
-    if user.password == password:
-        if user.temp_password:
-            return jsonify({'success': True, 'message': 'Contraseña temporal, debe cambiarla', 'change_required': True, 'user': username})
-        return jsonify({'success': True, 'message': 'Login exitoso', 'user': username, 'role': user.role.name})
+    if user.check_password(password):
+        # Si el usuario tiene temp_password, forzar cambio
+        return jsonify({
+            'success': True,
+            'message': 'Login exitoso',
+            'user': username,
+            'role': user.role.nombre,
+            'change_required': getattr(user, 'temp_password', False)
+        })
     return jsonify({'success': False, 'message': 'Credenciales inválidas'}), 401
 
 @app.route('/api/change-password', methods=['POST'])
@@ -93,11 +100,11 @@ def change_password():
     username = data.get('username')
     new_username = data.get('new_username')
     new_password = data.get('new_password')
-    user = User.query.filter_by(username=username).first()
+    user = User.query.filter_by(nombre=username).first()
     if not user:
         return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
-    user.username = new_username
-    user.password = new_password
+    user.nombre = new_username
+    user.set_password(new_password)
     user.temp_password = False
     db.session.commit()
     return jsonify({'success': True, 'message': 'Usuario y contraseña actualizados'})
@@ -108,10 +115,10 @@ def get_users():
     return jsonify({'success': True, 'users': [
         {
             'id': u.id,
-            'username': u.username,
+            'username': u.nombre,
             'email': u.email,
-            'role': u.role.name,
-            'is_active': u.is_active
+            'role': u.role.nombre,
+            'is_active': u.activo
         } for u in users
     ]})
 
@@ -120,28 +127,77 @@ def create_user():
     data = request.get_json()
     email = data.get('email')
     role_name = data.get('role')
-    role = Role.query.filter_by(name=role_name).first()
+    role = Role.query.filter_by(nombre=role_name).first()
     if not role:
         return jsonify({'success': False, 'message': 'Rol no válido'}), 400
     username = generate_username(email)
     temp_password = generate_temp_password()
-    user = User(username=username, email=email, password=temp_password, role_id=role.id, is_active=True, temp_password=True)
+    # Guardar email normalizado
+    clean_email = email.strip().lower()
+    user = User(nombre=username, email=clean_email, rol_id=role.id, activo=True)
+    user.set_password(temp_password)
+    # Flag para forzar cambio de contraseña en el primer login
+    user.temp_password = True
     db.session.add(user)
     db.session.commit()
     try:
-        send_temp_password(email, temp_password)
-        return jsonify({'success': True, 'message': 'Usuario creado y contraseña enviada', 'username': username})
+        send_temp_password(clean_email, temp_password)
+        return jsonify({'success': True, 'message': 'Usuario creado y contraseña enviada', 'username': username, 'change_required': True})
     except Exception as e:
-        return jsonify({'success': True, 'message': f'Usuario creado pero no se pudo enviar el correo: {str(e)}', 'username': username}), 200
+        return jsonify({'success': True, 'message': f'Usuario creado pero no se pudo enviar el correo: {str(e)}', 'username': username, 'change_required': True}), 200
+# --- Endpoint para solicitar recuperación de contraseña ---
+@app.route('/api/request-password-reset', methods=['POST'])
+def request_password_reset():
+    data = request.get_json()
+    email = data.get('email', '').strip().lower()
+    user = User.query.filter(db.func.lower(db.func.trim(User.email)) == email).first()
+    if not user:
+        return jsonify({'success': False, 'message': 'No existe un usuario con ese email'}), 404
+    # Generar código de 6 dígitos
+    code = ''.join(random.choices(string.digits, k=6))
+    expiracion = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
+    codigo = CodigosVerificacion(usuario_id=user.id, codigo=code, expiracion=expiracion)
+    db.session.add(codigo)
+    db.session.commit()
+    # Enviar email
+    try:
+        msg = Message('Código de recuperación de contraseña', sender=app.config['MAIL_USERNAME'], recipients=[email])
+        msg.body = f"Tu código de recuperación es: {code}\nEste código expira en 10 minutos."
+        mail.send(msg)
+        return jsonify({'success': True, 'message': 'Código enviado al correo'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'No se pudo enviar el correo: {str(e)}'}), 500
+
+# --- Endpoint para cambiar contraseña con código ---
+@app.route('/api/reset-password', methods=['POST'])
+def reset_password():
+    data = request.get_json()
+    email = data.get('email', '').strip().lower()
+    code = data.get('code')
+    new_password = data.get('new_password')
+    user = User.query.filter(db.func.lower(db.func.trim(User.email)) == email).first()
+    if not user:
+        return jsonify({'success': False, 'message': 'No existe un usuario con ese email'}), 404
+    codigo = CodigosVerificacion.query.filter_by(usuario_id=user.id, codigo=code, usado=False).first()
+    if not codigo:
+        return jsonify({'success': False, 'message': 'Código inválido'}), 400
+    if codigo.expiracion < datetime.datetime.utcnow():
+        return jsonify({'success': False, 'message': 'Código expirado'}), 400
+    # Cambiar contraseña
+    user.set_password(new_password)
+    db.session.commit()
+    codigo.usado = True
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Contraseña restablecida correctamente'})
 
 @app.route('/api/users/<int:user_id>/toggle', methods=['POST'])
 def toggle_user(user_id):
     user = User.query.get(user_id)
     if not user:
         return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
-    user.is_active = not user.is_active
+    user.activo = not user.activo
     db.session.commit()
-    return jsonify({'success': True, 'is_active': user.is_active})
+    return jsonify({'success': True, 'activo': user.activo})
 
 @app.route('/api/users/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
@@ -159,10 +215,10 @@ def get_dashboard():
     """Endpoint para obtener datos del dashboard o mapa"""
     data = request.get_json()
     username = data.get('username')
-    user = User.query.filter_by(username=username).first()
+    user = User.query.filter_by(nombre=username).first()
     if not user:
         return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
-    if user.role.name == 'admin':
+    if user.role.nombre == 'admin':
         dashboard_data = {
             "on_time_delivery": random.randint(85, 98),
             "avg_delivery_time": random.randint(25, 45),

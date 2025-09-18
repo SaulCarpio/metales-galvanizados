@@ -63,8 +63,17 @@ const UserCrud = () => {
   };
 
   const handleDeleteUser = async (id) => {
-    await authAPI.deleteUser(id);
-    fetchUsers();
+    setError('');
+    try {
+      await authAPI.deleteUser(id);
+      fetchUsers();
+    } catch (err) {
+      if (err.response && err.response.data && err.response.data.message) {
+        setError('Error al borrar usuario: ' + err.response.data.message);
+      } else {
+        setError('Error al borrar usuario: ' + (err.message || 'Error desconocido'));
+      }
+    }
   };
 
   return (
