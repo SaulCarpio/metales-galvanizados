@@ -1,8 +1,7 @@
-
-
-
-
-
+# =========================
+# IMPORTS Y CONFIGURACIÓN
+# =========================
+# Importa librerías necesarias para Flask, CORS, SQLAlchemy, envío de correos, manejo de variables de entorno, etc.
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -15,7 +14,10 @@ from models import db, User, Role, CodigosVerificacion
 from flask_bcrypt import Bcrypt
 import datetime
 
-
+# =========================
+# INICIALIZACIÓN DE LA APP
+# =========================
+# Carga variables de entorno y configura la app Flask, la base de datos, el correo y CORS.
 load_dotenv()
 app = Flask(__name__)
 bcrypt = Bcrypt(app)
@@ -32,19 +34,30 @@ app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
 db.init_app(app)
 mail = Mail(app)
 
+# =========================
+# FUNCIONES AUXILIARES
+# =========================
+
 def generate_temp_password(length=10):
+    """Genera una contraseña temporal aleatoria."""
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
 def send_temp_password(email, temp_password):
+    """Envía la contraseña temporal al correo del usuario."""
     msg = Message('Tu contraseña temporal', sender=app.config['MAIL_USERNAME'], recipients=[email])
     msg.body = f"Tu contraseña temporal es: {temp_password}\nPor favor cámbiala al iniciar sesión."
     mail.send(msg)
 
 def generate_username(email):
+    """Genera un nombre de usuario a partir del email (sin espacios, guiones, puntos, etc)."""
     local = email.split('@')[0]
     return local.replace(' ', '').replace('_', '').replace('-', '').replace('.', '')
 
 def create_tables():
+    """
+    Crea las tablas y los usuarios/roles iniciales si no existen.
+    Se ejecuta al iniciar la app.
+    """
     with app.app_context():
         db.create_all()
         # Crear roles y usuarios iniciales si no existen
@@ -75,8 +88,16 @@ def create_tables():
             db.session.add(user)
             db.session.commit()
 
+# =========================
+# ENDPOINTS DE AUTENTICACIÓN Y USUARIOS
+# =========================
+
 @app.route('/api/login', methods=['POST'])
 def login():
+    """
+    Endpoint para login de usuario.
+    Verifica usuario y contraseña, y retorna el rol y si debe cambiar contraseña.
+    """
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
@@ -96,6 +117,10 @@ def login():
 
 @app.route('/api/change-password', methods=['POST'])
 def change_password():
+    """
+    Endpoint para cambiar usuario y contraseña.
+    Marca temp_password como False después del cambio.
+    """
     data = request.get_json()
     username = data.get('username')
     new_username = data.get('new_username')
@@ -111,6 +136,9 @@ def change_password():
 
 @app.route('/api/users', methods=['GET'])
 def get_users():
+    """
+    Endpoint para obtener la lista de usuarios.
+    """
     users = User.query.all()
     return jsonify({'success': True, 'users': [
         {
@@ -124,6 +152,10 @@ def get_users():
 
 @app.route('/api/users', methods=['POST'])
 def create_user():
+    """
+    Endpoint para crear un nuevo usuario.
+    Genera contraseña temporal y la envía por correo.
+    """
     data = request.get_json()
     email = data.get('email')
     role_name = data.get('role')
@@ -145,9 +177,17 @@ def create_user():
         return jsonify({'success': True, 'message': 'Usuario creado y contraseña enviada', 'username': username, 'change_required': True})
     except Exception as e:
         return jsonify({'success': True, 'message': f'Usuario creado pero no se pudo enviar el correo: {str(e)}', 'username': username, 'change_required': True}), 200
-# --- Endpoint para solicitar recuperación de contraseña ---
+
+# =========================
+# ENDPOINTS DE RECUPERACIÓN DE CONTRASEÑA
+# =========================
+
 @app.route('/api/request-password-reset', methods=['POST'])
 def request_password_reset():
+    """
+    Endpoint para solicitar recuperación de contraseña.
+    Envía un código de verificación al correo si el usuario existe.
+    """
     data = request.get_json()
     email = data.get('email', '').strip().lower()
     user = User.query.filter(db.func.lower(db.func.trim(User.email)) == email).first()
@@ -168,9 +208,11 @@ def request_password_reset():
     except Exception as e:
         return jsonify({'success': False, 'message': f'No se pudo enviar el correo: {str(e)}'}), 500
 
-# --- Endpoint para cambiar contraseña con código ---
 @app.route('/api/reset-password', methods=['POST'])
 def reset_password():
+    """
+    Endpoint para restablecer la contraseña usando el código enviado por email.
+    """
     data = request.get_json()
     email = data.get('email', '').strip().lower()
     code = data.get('code')
@@ -190,8 +232,15 @@ def reset_password():
     db.session.commit()
     return jsonify({'success': True, 'message': 'Contraseña restablecida correctamente'})
 
+# =========================
+# ENDPOINTS DE ADMINISTRACIÓN DE USUARIOS
+# =========================
+
 @app.route('/api/users/<int:user_id>/toggle', methods=['POST'])
 def toggle_user(user_id):
+    """
+    Endpoint para habilitar/deshabilitar un usuario.
+    """
     user = User.query.get(user_id)
     if not user:
         return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
@@ -201,6 +250,9 @@ def toggle_user(user_id):
 
 @app.route('/api/users/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
+    """
+    Endpoint para eliminar un usuario.
+    """
     user = User.query.get(user_id)
     if not user:
         return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
@@ -208,11 +260,15 @@ def delete_user(user_id):
     db.session.commit()
     return jsonify({'success': True, 'message': 'Usuario eliminado'})
 
-
+# =========================
+# ENDPOINTS DE DASHBOARD Y OTROS
+# =========================
 
 @app.route('/api/dashboard', methods=['POST'])
 def get_dashboard():
-    """Endpoint para obtener datos del dashboard o mapa"""
+    """
+    Endpoint para obtener datos del dashboard (solo admin) o mostrar el mapa (usuario).
+    """
     data = request.get_json()
     username = data.get('username')
     user = User.query.filter_by(nombre=username).first()
@@ -246,7 +302,9 @@ def get_dashboard():
 
 @app.route('/api/routes', methods=['GET'])
 def get_routes():
-    """Endpoint para obtener información de rutas"""
+    """
+    Endpoint para obtener información de rutas (mock).
+    """
     routes = [
         {"id": 1, "name": "Ruta Norte", "driver": "Juan Pérez", "status": "En camino"},
         {"id": 2, "name": "Ruta Sur", "driver": "María García", "status": "Completada"},
@@ -257,13 +315,19 @@ def get_routes():
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Endpoint para verificar que el API está funcionando"""
+    """
+    Endpoint para verificar que el API está funcionando.
+    """
     return jsonify({
         'status': 'healthy',
-        'timestamp': datetime.now().isoformat(),
+        'timestamp': datetime.datetime.now().isoformat(),
         'service': 'Metales Galvanizados API'
     })
 
+# =========================
+# INICIO DE LA APP
+# =========================
+
 if __name__ == '__main__':
-    create_tables()  # <-- Esto crea las tablas antes de iniciar el servidor
+    create_tables()  # Crea las tablas y datos iniciales si no existen
     app.run(debug=True, host='0.0.0.0', port=5000)

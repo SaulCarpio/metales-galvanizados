@@ -2,12 +2,22 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail
 from flask_bcrypt import Bcrypt
 
+# =========================
+# INICIALIZACIÓN DE EXTENSIONES
+# =========================
+# Instancia de SQLAlchemy para la base de datos, Mail para correo y Bcrypt para contraseñas seguras.
 db = SQLAlchemy()
 mail = Mail()
 bcrypt = Bcrypt()
 
-# ========== MODELOS BASE ========== #
+# =========================
+# MODELOS BASE DEL SISTEMA
+# =========================
+
 class Role(db.Model):
+    """
+    Modelo de roles de usuario (admin, usuario, etc).
+    """
     __tablename__ = 'roles'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(50), unique=True, nullable=False)
@@ -15,6 +25,10 @@ class Role(db.Model):
     usuarios = db.relationship('User', backref='role', lazy=True)
 
 class User(db.Model):
+    """
+    Modelo de usuarios del sistema.
+    Incluye métodos para encriptar/verificar contraseñas con bcrypt.
+    """
     __tablename__ = 'usuarios'
     id = db.Column(db.Integer, primary_key=True)
     rol_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
@@ -30,16 +44,28 @@ class User(db.Model):
     def check_password(self, password):
         return bcrypt.check_password_hash(self.password_hash, password)
 
-# ========== HISTORIAL DE CONTRASEÑAS ========== #
+# =========================
+# HISTORIAL DE CONTRASEÑAS
+# =========================
+
 class HistorialContrasenas(db.Model):
+    """
+    Guarda el historial de contraseñas de cada usuario para evitar reutilización.
+    """
     __tablename__ = 'historial_contrasenas'
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
     password_hash = db.Column(db.String(255), nullable=False)
     fecha_cambio = db.Column(db.DateTime, server_default=db.func.now())
 
-# ========== CÓDIGOS DE VERIFICACIÓN ========== #
+# =========================
+# CÓDIGOS DE VERIFICACIÓN (RECUPERACIÓN)
+# =========================
+
 class CodigosVerificacion(db.Model):
+    """
+    Almacena los códigos enviados por email para recuperación de contraseña.
+    """
     __tablename__ = 'codigos_verificacion'
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
@@ -47,24 +73,42 @@ class CodigosVerificacion(db.Model):
     expiracion = db.Column(db.DateTime, nullable=False)
     usado = db.Column(db.Boolean, default=False)
 
-# ========== AUDITORÍA DE SISTEMA ========== #
+# =========================
+# AUDITORÍA DE SISTEMA
+# =========================
+
 class AuditoriaSistema(db.Model):
+    """
+    Guarda eventos importantes del sistema para auditoría.
+    """
     __tablename__ = 'auditoria_sistema'
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
     accion = db.Column(db.Text, nullable=False)
     fecha_evento = db.Column(db.DateTime, server_default=db.func.now())
 
-# ========== CONFIGURACIÓN DEL SISTEMA ========== #
+# =========================
+# CONFIGURACIÓN DEL SISTEMA
+# =========================
+
 class ConfiguracionSistema(db.Model):
+    """
+    Permite guardar parámetros de configuración clave-valor.
+    """
     __tablename__ = 'configuracion_sistema'
     id = db.Column(db.Integer, primary_key=True)
     clave = db.Column(db.String(100), unique=True, nullable=False)
     valor = db.Column(db.Text)
     actualizado_en = db.Column(db.DateTime, server_default=db.func.now())
 
-# ========== CLIENTES ========== #
+# =========================
+# CLIENTES (PERFIL DE USUARIO)
+# =========================
+
 class Cliente(db.Model):
+    """
+    Perfil extendido para usuarios tipo cliente.
+    """
     __tablename__ = 'clientes'
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), unique=True)
@@ -72,8 +116,14 @@ class Cliente(db.Model):
     telefono = db.Column(db.String(20))
     nit = db.Column(db.String(50))
 
-# ========== VEHÍCULOS ========== #
+# =========================
+# VEHÍCULOS
+# =========================
+
 class Vehiculo(db.Model):
+    """
+    Información de vehículos de la empresa.
+    """
     __tablename__ = 'vehiculos'
     id = db.Column(db.Integer, primary_key=True)
     placa = db.Column(db.String(20), unique=True, nullable=False)
@@ -81,16 +131,28 @@ class Vehiculo(db.Model):
     modelo = db.Column(db.String(50))
     capacidad = db.Column(db.Integer)
 
-# ========== CONDUCTORES ========== #
+# =========================
+# CONDUCTORES (PERFIL DE USUARIO)
+# =========================
+
 class Conductor(db.Model):
+    """
+    Perfil extendido para usuarios tipo conductor.
+    """
     __tablename__ = 'conductores'
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), unique=True)
     licencia = db.Column(db.String(50), unique=True, nullable=False)
     vehiculo_id = db.Column(db.Integer, db.ForeignKey('vehiculos.id'))
 
-# ========== PRODUCTOS ========== #
+# =========================
+# PRODUCTOS
+# =========================
+
 class Producto(db.Model):
+    """
+    Catálogo de productos.
+    """
     __tablename__ = 'productos'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(150), nullable=False)
@@ -100,8 +162,14 @@ class Producto(db.Model):
     stock = db.Column(db.Integer, default=0)
     activo = db.Column(db.Boolean, default=True)
 
-# ========== PEDIDOS ========== #
+# =========================
+# PEDIDOS
+# =========================
+
 class Pedido(db.Model):
+    """
+    Pedido realizado por un cliente.
+    """
     __tablename__ = 'pedidos'
     id = db.Column(db.Integer, primary_key=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'))
@@ -110,8 +178,14 @@ class Pedido(db.Model):
     prioridad = db.Column(db.String(20), default='normal')
     total = db.Column(db.Numeric(10,2), nullable=False)
 
-# ========== DETALLES DE PEDIDO ========== #
+# =========================
+# DETALLES DE PEDIDO
+# =========================
+
 class PedidoDetalle(db.Model):
+    """
+    Detalle de productos en un pedido.
+    """
     __tablename__ = 'pedido_detalles'
     id = db.Column(db.Integer, primary_key=True)
     pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos.id', ondelete='CASCADE'))
@@ -119,8 +193,14 @@ class PedidoDetalle(db.Model):
     cantidad = db.Column(db.Integer, nullable=False)
     subtotal = db.Column(db.Numeric(10,2), nullable=False)
 
-# ========== RUTAS ========== #
+# =========================
+# RUTAS DE ENTREGA
+# =========================
+
 class Ruta(db.Model):
+    """
+    Ruta asignada para un pedido.
+    """
     __tablename__ = 'rutas'
     id = db.Column(db.Integer, primary_key=True)
     pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos.id'))
@@ -128,8 +208,14 @@ class Ruta(db.Model):
     fecha_programada = db.Column(db.DateTime)
     estado = db.Column(db.String(50), default='pendiente')
 
-# ========== DETALLES DE RUTA ========== #
+# =========================
+# DETALLES DE RUTA
+# =========================
+
 class RutaDetalle(db.Model):
+    """
+    Detalle de puntos (lat/lon) de una ruta.
+    """
     __tablename__ = 'ruta_detalles'
     id = db.Column(db.Integer, primary_key=True)
     ruta_id = db.Column(db.Integer, db.ForeignKey('rutas.id', ondelete='CASCADE'))
@@ -137,8 +223,14 @@ class RutaDetalle(db.Model):
     lon = db.Column(db.Numeric(9,6))
     orden = db.Column(db.Integer)
 
-# ========== MOVIMIENTOS DE INVENTARIO ========== #
+# =========================
+# MOVIMIENTOS DE INVENTARIO
+# =========================
+
 class InventarioMovimiento(db.Model):
+    """
+    Registro de entradas y salidas de inventario.
+    """
     __tablename__ = 'inventario_movimientos'
     id = db.Column(db.Integer, primary_key=True)
     producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'))
@@ -146,8 +238,14 @@ class InventarioMovimiento(db.Model):
     tipo = db.Column(db.String(20), nullable=False) # entrada / salida
     fecha = db.Column(db.DateTime, server_default=db.func.now())
 
-# ========== MÉTRICAS DE ENTREGAS ========== #
+# =========================
+# MÉTRICAS DE ENTREGAS
+# =========================
+
 class MetricaEntrega(db.Model):
+    """
+    Métricas de desempeño de entregas (tiempo, retraso, combustible).
+    """
     __tablename__ = 'metricas_entregas'
     id = db.Column(db.Integer, primary_key=True)
     ruta_id = db.Column(db.Integer, db.ForeignKey('rutas.id'))
@@ -155,16 +253,28 @@ class MetricaEntrega(db.Model):
     retraso = db.Column(db.Boolean)
     combustible_usado = db.Column(db.Numeric(10,2))
 
-# ========== MÉTODOS DE PAGO ========== #
+# =========================
+# MÉTODOS DE PAGO
+# =========================
+
 class MetodoPago(db.Model):
+    """
+    Métodos de pago disponibles.
+    """
     __tablename__ = 'metodos_pago'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(50), unique=True, nullable=False)
     descripcion = db.Column(db.Text)
     activo = db.Column(db.Boolean, default=True)
 
-# ========== PAGOS ========== #
+# =========================
+# PAGOS
+# =========================
+
 class Pago(db.Model):
+    """
+    Registro de pagos realizados por pedidos.
+    """
     __tablename__ = 'pagos'
     id = db.Column(db.Integer, primary_key=True)
     pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos.id'))
@@ -173,8 +283,14 @@ class Pago(db.Model):
     fecha = db.Column(db.DateTime, server_default=db.func.now())
     estado = db.Column(db.String(50), default='pendiente')
 
-# ========== UBICACIONES DE EMPLEADOS ========== #
+# =========================
+# UBICACIONES DE EMPLEADOS
+# =========================
+
 class UbicacionEmpleado(db.Model):
+    """
+    Guarda la ubicación geográfica de empleados para seguimiento en mapa.
+    """
     __tablename__ = 'ubicaciones_empleados'
     id = db.Column(db.Integer, primary_key=True)
     empleado_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
@@ -182,8 +298,14 @@ class UbicacionEmpleado(db.Model):
     lon = db.Column(db.Numeric(10,6), nullable=False)
     fecha = db.Column(db.DateTime, server_default=db.func.now())
 
-# ========== NODOS (GRAFO VIAL) ========== #
+# =========================
+# GRAFO VIAL: NODOS Y ARISTAS
+# =========================
+
 class Nodo(db.Model):
+    """
+    Nodo/intersección del grafo vial (para rutas urbanas).
+    """
     __tablename__ = 'nodos'
     id = db.Column(db.Integer, primary_key=True)
     osmid = db.Column(db.BigInteger)
@@ -191,8 +313,10 @@ class Nodo(db.Model):
     lon = db.Column(db.Numeric(9,6), nullable=False)
     descripcion = db.Column(db.Text)
 
-# ========== ARISTAS (GRAFO VIAL) ========== #
 class Arista(db.Model):
+    """
+    Arista/calle del grafo vial, con atributos de restricción y velocidad.
+    """
     __tablename__ = 'aristas'
     id = db.Column(db.Integer, primary_key=True)
     osmid = db.Column(db.BigInteger)
@@ -205,8 +329,14 @@ class Arista(db.Model):
     motivo_restriccion = db.Column(db.Text)
     atributos = db.Column(db.JSON)
 
-# ========== NOTA DE VENTA (PROFORMAS) ========== #
+# =========================
+# NOTA DE VENTA (PROFORMAS)
+# =========================
+
 class NotaVenta(db.Model):
+    """
+    Registro de proformas o notas de venta.
+    """
     __tablename__ = 'nota_venta'
     id = db.Column(db.Integer, primary_key=True)
     nro_proforma = db.Column(db.String(20), unique=True, nullable=False)
