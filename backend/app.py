@@ -1,7 +1,6 @@
 # =========================
 # IMPORTS Y CONFIGURACIÓN
 # =========================
-# Importa librerías necesarias para Flask, CORS, SQLAlchemy, envío de correos, manejo de variables de entorno, etc.
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -13,11 +12,25 @@ import string
 from models import db, User, Role, CodigosVerificacion
 from flask_bcrypt import Bcrypt
 import datetime
+import joblib
+import numpy as np
+
+# =========================
+# IMPORTACIÓN DEL MODELO ML
+# =========================
+try:
+    from ml.ruta_modelo import MODEL_PATH, train_and_save_model
+except ImportError as e:
+    print(f"Advertencia: No se pudo importar el módulo ML: {e}")
+    MODEL_PATH = "ml/model_rf.pkl"
+    
+    def train_and_save_model():
+        print("Función de entrenamiento no disponible - ejecutando placeholder")
+        return None
 
 # =========================
 # INICIALIZACIÓN DE LA APP
 # =========================
-# Carga variables de entorno y configura la app Flask, la base de datos, el correo y CORS.
 load_dotenv()
 app = Flask(__name__)
 bcrypt = Bcrypt(app)
@@ -49,14 +62,13 @@ def send_temp_password(email, temp_password):
     mail.send(msg)
 
 def generate_username(email):
-    """Genera un nombre de usuario a partir del email (sin espacios, guiones, puntos, etc)."""
+    """Genera un nombre de usuario a partir del email."""
     local = email.split('@')[0]
     return local.replace(' ', '').replace('_', '').replace('-', '').replace('.', '')
 
 def create_tables():
     """
     Crea las tablas y los usuarios/roles iniciales si no existen.
-    Se ejecuta al iniciar la app.
     """
     with app.app_context():
         db.create_all()
@@ -94,10 +106,7 @@ def create_tables():
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    """
-    Endpoint para login de usuario.
-    Verifica usuario y contraseña, y retorna el rol y si debe cambiar contraseña.
-    """
+    """Endpoint para login de usuario."""
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
@@ -105,7 +114,6 @@ def login():
     if not user or not user.activo:
         return jsonify({'success': False, 'message': 'Usuario no existe o está deshabilitado'}), 401
     if user.check_password(password):
-        # Si el usuario tiene temp_password, forzar cambio
         return jsonify({
             'success': True,
             'message': 'Login exitoso',
@@ -117,10 +125,7 @@ def login():
 
 @app.route('/api/change-password', methods=['POST'])
 def change_password():
-    """
-    Endpoint para cambiar usuario y contraseña.
-    Marca temp_password como False después del cambio.
-    """
+    """Endpoint para cambiar usuario y contraseña."""
     data = request.get_json()
     username = data.get('username')
     new_username = data.get('new_username')
@@ -136,9 +141,7 @@ def change_password():
 
 @app.route('/api/users', methods=['GET'])
 def get_users():
-    """
-    Endpoint para obtener la lista de usuarios.
-    """
+    """Endpoint para obtener la lista de usuarios."""
     users = User.query.all()
     return jsonify({'success': True, 'users': [
         {
@@ -152,10 +155,7 @@ def get_users():
 
 @app.route('/api/users', methods=['POST'])
 def create_user():
-    """
-    Endpoint para crear un nuevo usuario.
-    Genera contraseña temporal y la envía por correo.
-    """
+    """Endpoint para crear un nuevo usuario."""
     data = request.get_json()
     email = data.get('email')
     role_name = data.get('role')
@@ -164,11 +164,9 @@ def create_user():
         return jsonify({'success': False, 'message': 'Rol no válido'}), 400
     username = generate_username(email)
     temp_password = generate_temp_password()
-    # Guardar email normalizado
     clean_email = email.strip().lower()
     user = User(nombre=username, email=clean_email, rol_id=role.id, activo=True)
     user.set_password(temp_password)
-    # Flag para forzar cambio de contraseña en el primer login
     user.temp_password = True
     db.session.add(user)
     db.session.commit()
@@ -184,22 +182,17 @@ def create_user():
 
 @app.route('/api/request-password-reset', methods=['POST'])
 def request_password_reset():
-    """
-    Endpoint para solicitar recuperación de contraseña.
-    Envía un código de verificación al correo si el usuario existe.
-    """
+    """Endpoint para solicitar recuperación de contraseña."""
     data = request.get_json()
     email = data.get('email', '').strip().lower()
     user = User.query.filter(db.func.lower(db.func.trim(User.email)) == email).first()
     if not user:
         return jsonify({'success': False, 'message': 'No existe un usuario con ese email'}), 404
-    # Generar código de 6 dígitos
     code = ''.join(random.choices(string.digits, k=6))
     expiracion = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
     codigo = CodigosVerificacion(usuario_id=user.id, codigo=code, expiracion=expiracion)
     db.session.add(codigo)
     db.session.commit()
-    # Enviar email
     try:
         msg = Message('Código de recuperación de contraseña', sender=app.config['MAIL_USERNAME'], recipients=[email])
         msg.body = f"Tu código de recuperación es: {code}\nEste código expira en 10 minutos."
@@ -210,9 +203,7 @@ def request_password_reset():
 
 @app.route('/api/reset-password', methods=['POST'])
 def reset_password():
-    """
-    Endpoint para restablecer la contraseña usando el código enviado por email.
-    """
+    """Endpoint para restablecer la contraseña usando el código enviado por email."""
     data = request.get_json()
     email = data.get('email', '').strip().lower()
     code = data.get('code')
@@ -225,7 +216,6 @@ def reset_password():
         return jsonify({'success': False, 'message': 'Código inválido'}), 400
     if codigo.expiracion < datetime.datetime.utcnow():
         return jsonify({'success': False, 'message': 'Código expirado'}), 400
-    # Cambiar contraseña
     user.set_password(new_password)
     db.session.commit()
     codigo.usado = True
@@ -238,9 +228,7 @@ def reset_password():
 
 @app.route('/api/users/<int:user_id>/toggle', methods=['POST'])
 def toggle_user(user_id):
-    """
-    Endpoint para habilitar/deshabilitar un usuario.
-    """
+    """Endpoint para habilitar/deshabilitar un usuario."""
     user = User.query.get(user_id)
     if not user:
         return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
@@ -250,9 +238,7 @@ def toggle_user(user_id):
 
 @app.route('/api/users/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
-    """
-    Endpoint para eliminar un usuario.
-    """
+    """Endpoint para eliminar un usuario."""
     user = User.query.get(user_id)
     if not user:
         return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
@@ -261,14 +247,62 @@ def delete_user(user_id):
     return jsonify({'success': True, 'message': 'Usuario eliminado'})
 
 # =========================
+# ENDPOINTS DE MACHINE LEARNING - RUTAS
+# =========================
+
+@app.route('/api/predict-route-time', methods=['POST'])
+def predict_route_time():
+    """
+    Endpoint que recibe los datos de una ruta y retorna la predicción de tiempo de entrega usando el modelo ML.
+    Espera un JSON con: dist_m, base_time_sec, is_thursday
+    """
+    data = request.get_json()
+    dist_m = data.get('dist_m')
+    base_time_sec = data.get('base_time_sec')
+    is_thursday = data.get('is_thursday', 0)
+
+    # Validar datos de entrada
+    if dist_m is None or base_time_sec is None:
+        return jsonify({'success': False, 'message': 'Se requieren dist_m y base_time_sec'}), 400
+
+    # Cargar el modelo entrenado
+    try:
+        model = joblib.load(MODEL_PATH)
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error cargando el modelo: {str(e)}'}), 500
+
+    # Preparar datos para predicción
+    X = np.array([[dist_m, base_time_sec, is_thursday]])
+    try:
+        pred = model.predict(X)[0]
+        return jsonify({
+            'success': True, 
+            'predicted_time_sec': float(pred),
+            'predicted_time_min': round(float(pred) / 60.0, 2)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error en la predicción: {str(e)}'}), 500
+
+@app.route('/api/train-route-model', methods=['POST'])
+def train_route_model():
+    """
+    Endpoint para reentrenar el modelo ML con nuevos datos.
+    """
+    try:
+        # Ejecuta el pipeline principal de ruta_modelo.py
+        from ml import ruta_modelo
+        ruta_modelo.main()
+        return jsonify({'success': True, 'message': 'Modelo reentrenado y guardado.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error al entrenar el modelo: {str(e)}'}), 500
+
+# =========================
 # ENDPOINTS DE DASHBOARD Y OTROS
 # =========================
 
 @app.route('/api/dashboard', methods=['POST'])
 def get_dashboard():
-    """
-    Endpoint para obtener datos del dashboard (solo admin) o mostrar el mapa (usuario).
-    """
+    """Endpoint para obtener datos del dashboard (solo admin) o mostrar el mapa (usuario)."""
     data = request.get_json()
     username = data.get('username')
     user = User.query.filter_by(nombre=username).first()
@@ -302,9 +336,7 @@ def get_dashboard():
 
 @app.route('/api/routes', methods=['GET'])
 def get_routes():
-    """
-    Endpoint para obtener información de rutas (mock).
-    """
+    """Endpoint para obtener información de rutas (mock)."""
     routes = [
         {"id": 1, "name": "Ruta Norte", "driver": "Juan Pérez", "status": "En camino"},
         {"id": 2, "name": "Ruta Sur", "driver": "María García", "status": "Completada"},
@@ -315,9 +347,7 @@ def get_routes():
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """
-    Endpoint para verificar que el API está funcionando.
-    """
+    """Endpoint para verificar que el API está funcionando."""
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.datetime.now().isoformat(),
