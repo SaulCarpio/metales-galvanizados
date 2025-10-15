@@ -110,17 +110,31 @@ def login():
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
+    
     user = User.query.filter_by(nombre=username).first()
+    
     if not user or not user.activo:
         return jsonify({'success': False, 'message': 'Usuario no existe o está deshabilitado'}), 401
+    
     if user.check_password(password):
+        # Determinar redirección según rol_id
+        if user.rol_id == 1:  # Admin
+            redirect_url = '/dashboard'  # o la ruta que uses para admin
+        elif user.rol_id == 2:  # Usuario
+            redirect_url = '/map'  # o la ruta que uses para usuario normal
+        else:
+            redirect_url = '/'  # Ruta por defecto
+        
         return jsonify({
             'success': True,
             'message': 'Login exitoso',
             'user': username,
             'role': user.role.nombre,
+            'rol_id': user.rol_id,
+            'redirect_url': redirect_url,
             'change_required': getattr(user, 'temp_password', False)
         })
+    
     return jsonify({'success': False, 'message': 'Credenciales inválidas'}), 401
 
 @app.route('/api/change-password', methods=['POST'])

@@ -31,3 +31,19 @@ rtree==1.2.0
 # Extra utils
 # -------------------
 requests==2.32.3
+
+# -------------------
+# Auth & Email
+# -------------------
+Flask-Mail==0.9.1
+Flask-Bcrypt==1.0.1
+
+# -------------------
+# Env management
+# -------------------
+python-dotenv==1.0.1
+
+# -------------------
+# PostgreSQL adapter
+# -------------------
+psycopg2-binary==2.9.9
