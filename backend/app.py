@@ -374,4 +374,4 @@ def health_check():
 
 if __name__ == '__main__':
     create_tables()  # Crea las tablas y datos iniciales si no existen
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=80)
