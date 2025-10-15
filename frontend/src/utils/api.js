@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Cambia esta IP si accedes desde otro dispositivo o red
-const API_URL = 'http://192.168.0.24:5000/api';
+const API_URL = 'http://192.168.0.24:8080/api';
 
 const api = axios.create({
   baseURL: API_URL,
