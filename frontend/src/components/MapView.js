@@ -1,9 +1,85 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 
 const MapView = () => {
-  const username = localStorage.getItem('username');
   const navigate = useNavigate();
+  const username = localStorage.getItem('username');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [routeInfo, setRouteInfo] = useState(null);
+  const mapRef = useRef(null);
+  const mapInstance = useRef(null);
+  const routeLayer = useRef(null);
+  const markersLayer = useRef(null);
+
+  useEffect(() => {
+    // Inicializar mapa centrado en El Alto
+    mapInstance.current = L.map(mapRef.current).setView([-16.5, -68.189], 13);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance.current);
+    
+    markersLayer.current = L.layerGroup().addTo(mapInstance.current);
+    
+    // Permitir seleccionar puntos en el mapa
+    let points = [];
+    mapInstance.current.on('click', (e) => {
+      if (points.length >= 2) {
+        points = [];
+        markersLayer.current.clearLayers();
+        if (routeLayer.current) {
+          routeLayer.current.remove();
+        }
+      }
+      
+      points.push([e.latlng.lat, e.latlng.lng]);
+      L.marker(e.latlng).addTo(markersLayer.current);
+
+      if (points.length === 2) {
+        findRoute(points[0], points[1]);
+      }
+    });
+
+    return () => mapInstance.current.remove();
+  }, []);
+
+  const findRoute = async (origin, destination) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post('http://localhost:8080/api/find-route', {
+        origin,
+        destination
+      });
+
+      if (response.data.success) {
+        // Dibujar ruta
+        if (routeLayer.current) {
+          routeLayer.current.remove();
+        }
+        routeLayer.current = L.polyline(response.data.route.coordinates, {
+          color: 'blue',
+          weight: 4
+        }).addTo(mapInstance.current);
+
+        // Mostrar info
+        setRouteInfo({
+          distance: (response.data.route.distance_meters / 1000).toFixed(2),
+          predictedTime: response.data.route.predicted_time_min.toFixed(2),
+          processingTime: response.data.processing_time_ms
+        });
+
+        // Ajustar vista
+        mapInstance.current.fitBounds(routeLayer.current.getBounds());
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al buscar ruta');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -13,22 +89,64 @@ const MapView = () => {
   };
 
   return (
-    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', margin: 0, padding: 0 }}>
-      <div style={{ width: '100%', padding: '20px', background: '#3498db', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: '0 0 auto' }}>
-        <span>Bienvenido, {username}</span>
-        <button onClick={handleLogout} style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer', fontWeight: '600', fontSize: '0.97rem', minWidth: '80px', maxWidth: '120px' }}>Cerrar sesión</button>
+    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ 
+        padding: '10px 20px',
+        background: '#3498db',
+        color: 'white',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <div>
+          <span style={{ marginRight: '20px' }}>Bienvenido, {username}</span>
+          {routeInfo && (
+            <span>
+              Distancia: {routeInfo.distance} km | 
+              Tiempo estimado: {routeInfo.predictedTime} min |
+              Tiempo de búsqueda: {routeInfo.processingTime} ms
+            </span>
+          )}
+        </div>
+        <button onClick={handleLogout} style={{
+          background: '#e74c3c',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          padding: '8px 16px',
+          cursor: 'pointer'
+        }}>
+          Cerrar sesión
+        </button>
       </div>
-      <div style={{ flex: 1, width: '100%', height: '100%', minHeight: 0 }}>
-        <iframe
-          title="OpenStreetMap"
-          width="100%"
-          height="100%"
-          frameBorder="0"
-          src="https://www.openstreetmap.org/export/embed.html?bbox=-70.0,-23.0,-57.0,-9.0&layer=mapnik"
-          style={{ border: 0, width: '100%', height: '100%' }}
-          allowFullScreen
-        ></iframe>
-      </div>
+      
+      {error && (
+        <div style={{
+          padding: '10px',
+          background: '#f8d7da',
+          color: '#721c24',
+          textAlign: 'center'
+        }}>
+          {error}
+        </div>
+      )}
+      
+      {loading && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(255,255,255,0.8)',
+          padding: '20px',
+          borderRadius: '8px',
+          zIndex: 1000
+        }}>
+          Buscando mejor ruta...
+        </div>
+      )}
+      
+      <div ref={mapRef} style={{ flex: 1 }}></div>
     </div>
   );
 };

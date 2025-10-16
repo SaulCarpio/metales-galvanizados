@@ -368,6 +368,82 @@ def health_check():
         'service': 'Metales Galvanizados API'
     })
 
+@app.route('/api/find-route', methods=['POST'])
+def find_route():
+    """
+    Endpoint para encontrar la mejor ruta en El Alto usando ML.
+    Espera: {
+        "origin": [lat, lon],
+        "destination": [lat, lon]
+    }
+    """
+    start_time = datetime.datetime.now()
+    
+    data = request.get_json()
+    origin = data.get('origin')
+    destination = data.get('destination')
+
+    if not origin or not destination:
+        return jsonify({
+            'success': False,
+            'message': 'Se requieren puntos de origen y destino'
+        }), 400
+
+    try:
+        # Cargar el grafo de El Alto
+        from ml.ruta_modelo import load_graph_z16, shortest_route_stats
+        G = load_graph_z16()
+
+        # Encontrar nodos más cercanos a origen y destino
+        orig_node = ox.nearest_nodes(G, origin[1], origin[0])
+        dest_node = ox.nearest_nodes(G, destination[1], destination[0])
+
+        # Calcular ruta
+        path, dist, tsec = shortest_route_stats(G, orig_node, dest_node)
+        
+        if not path:
+            return jsonify({
+                'success': False,
+                'message': 'No se encontró ruta entre los puntos'
+            }), 404
+
+        # Extraer coordenadas de la ruta
+        route_coords = []
+        for node in path:
+            node_data = G.nodes[node]
+            route_coords.append([
+                float(node_data['y']), # lat
+                float(node_data['x'])  # lon
+            ])
+
+        # Predecir tiempo con ML
+        is_thursday = datetime.datetime.now().weekday() == 3
+        pred_time = predict_route_time({
+            'dist_m': dist,
+            'base_time_sec': tsec,
+            'is_thursday': int(is_thursday)
+        })
+
+        end_time = datetime.datetime.now()
+        processing_time = (end_time - start_time).total_seconds() * 1000
+
+        return jsonify({
+            'success': True,
+            'route': {
+                'coordinates': route_coords,
+                'distance_meters': round(dist, 2),
+                'base_time_sec': round(tsec, 2),
+                'predicted_time_min': round(pred_time['predicted_time_min'], 2)
+            },
+            'processing_time_ms': round(processing_time, 2)
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error al calcular ruta: {str(e)}'
+        }), 500
+
 # =========================
 # INICIO DE LA APP
 # =========================
