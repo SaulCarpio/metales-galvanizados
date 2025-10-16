@@ -16,29 +16,43 @@ const MapView = () => {
   const mapInstance = useRef(null);
   const routeLayer = useRef(null);
   const markersLayer = useRef(null);
+  const pointsRef = useRef([]); // Usar ref para mantener el array entre renders
 
   useEffect(() => {
     // Inicializar mapa centrado en El Alto
     mapInstance.current = L.map(mapRef.current).setView([-16.5, -68.189], 13);
-    
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance.current);
-    
+
     markersLayer.current = L.layerGroup().addTo(mapInstance.current);
-    
-    // Permitir seleccionar puntos en el mapa
-    let points = [];
+
+    const redDotIcon = L.divIcon({
+      className: 'custom-marker',
+      iconSize: [18, 18],
+      iconAnchor: [9, 9], // centro del círculo
+    });
+
+    // Solo un listener y un solo array de puntos
     mapInstance.current.on('click', (e) => {
+      let points = pointsRef.current;
+
+      // Si ya hay dos puntos, limpiar todo y empezar de nuevo
       if (points.length >= 2) {
         points = [];
+        pointsRef.current = [];
         markersLayer.current.clearLayers();
         if (routeLayer.current) {
           routeLayer.current.remove();
         }
+        setRouteInfo(null);
       }
-      
-      points.push([e.latlng.lat, e.latlng.lng]);
-      L.marker(e.latlng).addTo(markersLayer.current);
 
+      // Agregar el nuevo punto
+      points.push([e.latlng.lat, e.latlng.lng]);
+      pointsRef.current = points;
+      L.marker(e.latlng, { icon: redDotIcon }).addTo(markersLayer.current);
+
+      // Si hay dos puntos, buscar la ruta
       if (points.length === 2) {
         findRoute(points[0], points[1]);
       }
@@ -55,7 +69,7 @@ const MapView = () => {
         origin,
         destination
       }, {
-        timeout: 60000, // Aumentar timeout a 60 segundos
+        timeout: 60000,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
@@ -74,7 +88,7 @@ const MapView = () => {
       if (routeLayer.current) {
         routeLayer.current.remove();
       }
-      
+
       if (!response.data.route?.coordinates?.length) {
         throw new Error('No se encontraron coordenadas para la ruta');
       }
@@ -97,12 +111,12 @@ const MapView = () => {
     } catch (err) {
       console.error('Error detallado:', err);
       let errorMessage = 'Error al buscar ruta. ';
-      
+
       if (err.response) {
         // Error de respuesta del servidor
         console.error('Error del servidor:', err.response.data);
-        errorMessage += err.response.data.message || 
-                       `Error ${err.response.status}: ${err.response.statusText}`;
+        errorMessage += err.response.data.message ||
+          `Error ${err.response.status}: ${err.response.statusText}`;
       } else if (err.request) {
         // Error de conexión
         errorMessage += 'No se pudo conectar con el servidor. Verifique su conexión.';
@@ -110,7 +124,7 @@ const MapView = () => {
         // Otro tipo de error
         errorMessage += err.message;
       }
-      
+
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -126,7 +140,7 @@ const MapView = () => {
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ 
+      <div style={{
         padding: '10px 20px',
         background: '#3498db',
         color: 'white',
@@ -138,7 +152,7 @@ const MapView = () => {
           <span style={{ marginRight: '20px' }}>Bienvenido, {username}</span>
           {routeInfo && (
             <span>
-              Distancia: {routeInfo.distance} km | 
+              Distancia: {routeInfo.distance} km |
               Tiempo estimado: {routeInfo.predictedTime} min |
               Tiempo de búsqueda: {routeInfo.processingTime} ms
             </span>
@@ -155,7 +169,7 @@ const MapView = () => {
           Cerrar sesión
         </button>
       </div>
-      
+
       {error && (
         <div style={{
           padding: '10px',
@@ -166,7 +180,7 @@ const MapView = () => {
           {error}
         </div>
       )}
-      
+
       {loading && (
         <div style={{
           position: 'absolute',
@@ -181,7 +195,7 @@ const MapView = () => {
           Buscando mejor ruta...
         </div>
       )}
-      
+
       <div ref={mapRef} style={{ flex: 1 }}></div>
     </div>
   );

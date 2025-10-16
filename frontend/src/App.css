@@ -34,3 +34,12 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+
+.custom-marker {
+  width: 18px;
+  height: 18px;
+  background: red;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 4px #333;
+}
