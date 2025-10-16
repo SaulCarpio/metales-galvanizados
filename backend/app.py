@@ -21,6 +21,7 @@ from ml.ruta_modelo import load_graph_z16, shortest_route_stats, ensure_edge_spe
 # =========================
 # IMPORTACIÓN DEL MODELO ML
 # =========================
+G_CACHED = None
 try:
     from ml.ruta_modelo import MODEL_PATH, train_and_save_model
 except ImportError as e:
