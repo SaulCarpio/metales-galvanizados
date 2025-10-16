@@ -19,27 +19,59 @@ import networkx as nx
 from ml.ruta_modelo import load_graph_z16, shortest_route_stats, ensure_edge_speeds
 
 # =========================
-# IMPORTACIÓN DEL MODELO ML
+# VARIABLES GLOBALES Y ML
 # =========================
 G_CACHED = None
-try:
-    from ml.ruta_modelo import MODEL_PATH, train_and_save_model
-except ImportError as e:
-    print(f"Advertencia: No se pudo importar el módulo ML: {e}")
-    MODEL_PATH = "ml/model_rf.pkl"
-    
-    def train_and_save_model():
-        print("Función de entrenamiento no disponible - ejecutando placeholder")
-        return None
+MODEL_CACHED = None
+
+def load_ml_model():
+    """Carga y cachea el modelo ML."""
+    global MODEL_CACHED
+    if MODEL_CACHED is None:
+        try:
+            MODEL_CACHED = joblib.load('ml/model_rf.pkl')
+            print("Modelo ML cargado exitosamente")
+        except Exception as e:
+            print(f"Error cargando modelo ML: {e}")
+    return MODEL_CACHED
 
 def init_graph():
     """Inicializa y cachea el grafo para reutilizarlo."""
     global G_CACHED
     if G_CACHED is None:
-        G = load_graph_z16(use_cache=True)
-        ensure_edge_speeds(G, fallback_kph=30.0)
-        G_CACHED = G
+        try:
+            # Intenta cargar el grafo pre-guardado
+            G_CACHED = ox.load_graphml('ml/graph_gpkg.graphml')
+            ensure_edge_speeds(G_CACHED, fallback_kph=30.0)
+            print("Grafo cargado desde archivo local")
+        except Exception as e:
+            print(f"Error cargando grafo local: {e}")
+            print("Descargando grafo desde OSM...")
+            G_CACHED = load_graph_z16(use_cache=True)
+            ensure_edge_speeds(G_CACHED, fallback_kph=30.0)
     return G_CACHED
+
+def predict_route_time(data):
+    """Predice tiempo de ruta usando modelo pre-entrenado."""
+    model = load_ml_model()
+    if not model:
+        return {'predicted_time_min': data['base_time_sec'] / 60.0}
+    
+    try:
+        X = np.array([[
+            data['dist_m'],
+            data['base_time_sec'],
+            data['is_thursday']
+        ]])
+        pred_sec = model.predict(X)[0]
+        return {
+            'predicted_time_sec': float(pred_sec),
+            'predicted_time_min': round(float(pred_sec) / 60.0, 2)
+        }
+    except Exception as e:
+        print(f"Error en predicción: {e}")
+        return {'predicted_time_min': data['base_time_sec'] / 60.0}
+
 # =========================
 # INICIALIZACIÓN DE LA APP
 # =========================
@@ -380,6 +412,10 @@ def health_check():
         'service': 'Metales Galvanizados API'
     })
 
+# =========================
+# ENDPOINTS DE ML Y RUTAS
+# =========================
+
 @app.route('/api/find-route', methods=['POST'])
 def find_route():
     """Endpoint optimizado para encontrar la mejor ruta."""
@@ -404,7 +440,7 @@ def find_route():
         dest_node = ox.nearest_nodes(G, destination[1], destination[0])
 
         # Calcular ruta optimizada
-        path, dist, tsec = shortest_route_stats(G, orig_node, dest_node, weight="length")
+        path, dist, tsec = shortest_route_stats(G, orig_node, dest_node)
         
         if not path:
             return jsonify({
