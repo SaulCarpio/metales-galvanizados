@@ -578,3 +578,20 @@ class PrediccionML(db.Model):
 
 
 # Fin del archivo models.py
+# =========================
+# CÓDIGOS DE VERIFICACIÓN
+# =========================
+
+class CodigosVerificacion(db.Model):
+    """
+    Almacena códigos de verificación para recuperación de contraseña.
+    """
+    __tablename__ = 'codigos_verificacion'
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'))
+    codigo = db.Column(db.String(10), nullable=False)
+    expiracion = db.Column(db.DateTime, nullable=False)
+    usado = db.Column(db.Boolean, default=False)
+    usuario = db.relationship('User', backref='codigos_verificacion')
+
+# ...existing code...
