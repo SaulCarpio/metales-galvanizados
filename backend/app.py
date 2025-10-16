@@ -14,6 +14,9 @@ from flask_bcrypt import Bcrypt
 import datetime
 import joblib
 import numpy as np
+import osmnx as ox
+import networkx as nx
+from ml.ruta_modelo import load_graph_z16, shortest_route_stats, ensure_edge_speeds
 
 # =========================
 # IMPORTACIÓN DEL MODELO ML
@@ -28,6 +31,14 @@ except ImportError as e:
         print("Función de entrenamiento no disponible - ejecutando placeholder")
         return None
 
+def init_graph():
+    """Inicializa y cachea el grafo para reutilizarlo."""
+    global G_CACHED
+    if G_CACHED is None:
+        G = load_graph_z16(use_cache=True)
+        ensure_edge_speeds(G, fallback_kph=30.0)
+        G_CACHED = G
+    return G_CACHED
 # =========================
 # INICIALIZACIÓN DE LA APP
 # =========================
@@ -370,36 +381,29 @@ def health_check():
 
 @app.route('/api/find-route', methods=['POST'])
 def find_route():
-    """
-    Endpoint para encontrar la mejor ruta en El Alto usando ML.
-    Espera: {
-        "origin": [lat, lon],
-        "destination": [lat, lon]
-    }
-    """
+    """Endpoint optimizado para encontrar la mejor ruta."""
     start_time = datetime.datetime.now()
     
-    data = request.get_json()
-    origin = data.get('origin')
-    destination = data.get('destination')
-
-    if not origin or not destination:
-        return jsonify({
-            'success': False,
-            'message': 'Se requieren puntos de origen y destino'
-        }), 400
-
     try:
-        # Cargar el grafo de El Alto
-        from ml.ruta_modelo import load_graph_z16, shortest_route_stats
-        G = load_graph_z16()
+        data = request.get_json()
+        origin = data.get('origin')
+        destination = data.get('destination')
 
-        # Encontrar nodos más cercanos a origen y destino
+        if not origin or not destination:
+            return jsonify({
+                'success': False,
+                'message': 'Se requieren puntos de origen y destino'
+            }), 400
+
+        # Usar grafo cacheado
+        G = init_graph()
+
+        # Encontrar nodos más cercanos
         orig_node = ox.nearest_nodes(G, origin[1], origin[0])
         dest_node = ox.nearest_nodes(G, destination[1], destination[0])
 
-        # Calcular ruta
-        path, dist, tsec = shortest_route_stats(G, orig_node, dest_node)
+        # Calcular ruta optimizada
+        path, dist, tsec = shortest_route_stats(G, orig_node, dest_node, weight="length")
         
         if not path:
             return jsonify({
@@ -407,14 +411,8 @@ def find_route():
                 'message': 'No se encontró ruta entre los puntos'
             }), 404
 
-        # Extraer coordenadas de la ruta
-        route_coords = []
-        for node in path:
-            node_data = G.nodes[node]
-            route_coords.append([
-                float(node_data['y']), # lat
-                float(node_data['x'])  # lon
-            ])
+        # Extraer coordenadas eficientemente
+        route_coords = [[float(G.nodes[node]['y']), float(G.nodes[node]['x'])] for node in path]
 
         # Predecir tiempo con ML
         is_thursday = datetime.datetime.now().weekday() == 3

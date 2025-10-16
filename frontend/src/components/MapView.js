@@ -49,10 +49,11 @@ const MapView = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post('http://localhost:8080/api/find-route', {
+      const response = await axios.post('http://192.168.0.24:8080/api/find-route', {
         origin,
         destination
       });
+      
 
       if (response.data.success) {
         // Dibujar ruta
