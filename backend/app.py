@@ -51,12 +51,11 @@ def init_graph():
             ensure_edge_speeds(G_CACHED, fallback_kph=30.0)
     return G_CACHED
 
-def predict_route_time(data):
+def predict_route_time_ml(data):
     """Predice tiempo de ruta usando modelo pre-entrenado."""
     model = load_ml_model()
     if not model:
         return {'predicted_time_min': data['base_time_sec'] / 60.0}
-    
     try:
         X = np.array([[
             data['dist_m'],
@@ -453,7 +452,7 @@ def find_route():
 
         # Predecir tiempo con ML
         is_thursday = datetime.datetime.now().weekday() == 3
-        pred_time = predict_route_time({
+        pred_time = predict_route_time_ml({
             'dist_m': dist,
             'base_time_sec': tsec,
             'is_thursday': int(is_thursday)

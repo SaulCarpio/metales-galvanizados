@@ -4,6 +4,8 @@ import axios from 'axios';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
+const API_BASE_URL = 'http://192.168.0.24:8080';
+
 const MapView = () => {
   const navigate = useNavigate();
   const username = localStorage.getItem('username');
@@ -49,34 +51,67 @@ const MapView = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post('http://192.168.0.24:8080/api/find-route', {
+      const response = await axios.post(`${API_BASE_URL}/api/find-route`, {
         origin,
         destination
-      });
-      
-
-      if (response.data.success) {
-        // Dibujar ruta
-        if (routeLayer.current) {
-          routeLayer.current.remove();
+      }, {
+        timeout: 60000, // Aumentar timeout a 60 segundos
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
-        routeLayer.current = L.polyline(response.data.route.coordinates, {
-          color: 'blue',
-          weight: 4
-        }).addTo(mapInstance.current);
+      });
 
-        // Mostrar info
-        setRouteInfo({
-          distance: (response.data.route.distance_meters / 1000).toFixed(2),
-          predictedTime: response.data.route.predicted_time_min.toFixed(2),
-          processingTime: response.data.processing_time_ms
-        });
-
-        // Ajustar vista
-        mapInstance.current.fitBounds(routeLayer.current.getBounds());
+      if (!response.data) {
+        throw new Error('No se recibió respuesta del servidor');
       }
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al procesar la ruta');
+      }
+
+      // Dibujar ruta
+      if (routeLayer.current) {
+        routeLayer.current.remove();
+      }
+      
+      if (!response.data.route?.coordinates?.length) {
+        throw new Error('No se encontraron coordenadas para la ruta');
+      }
+
+      routeLayer.current = L.polyline(response.data.route.coordinates, {
+        color: 'blue',
+        weight: 4
+      }).addTo(mapInstance.current);
+
+      // Mostrar info
+      setRouteInfo({
+        distance: (response.data.route.distance_meters / 1000).toFixed(2),
+        predictedTime: response.data.route.predicted_time_min.toFixed(2),
+        processingTime: response.data.processing_time_ms
+      });
+
+      // Ajustar vista
+      mapInstance.current.fitBounds(routeLayer.current.getBounds());
+
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al buscar ruta');
+      console.error('Error detallado:', err);
+      let errorMessage = 'Error al buscar ruta. ';
+      
+      if (err.response) {
+        // Error de respuesta del servidor
+        console.error('Error del servidor:', err.response.data);
+        errorMessage += err.response.data.message || 
+                       `Error ${err.response.status}: ${err.response.statusText}`;
+      } else if (err.request) {
+        // Error de conexión
+        errorMessage += 'No se pudo conectar con el servidor. Verifique su conexión.';
+      } else {
+        // Otro tipo de error
+        errorMessage += err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
