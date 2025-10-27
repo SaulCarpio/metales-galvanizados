@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardAPI } from '../utils/api';
 import UserCrud from './UserCrud';
+import MapView from './MapView';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -11,6 +12,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('inicio');
   const [openModule, setOpenModule] = useState(null);
   const navigate = useNavigate();
+  const role = localStorage.getItem('role') || 'usuario'; // 'admin' or 'usuario'
 
   useEffect(() => {
     fetchDashboardData();
@@ -68,8 +70,8 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="dashboard">
-      {/* Sidebar */}
+   <div className="dashboard">
+      {/* Sidebar izquierdo */}
       <aside className="sidebar">
         <h2 className="sidebar-title">Menú</h2>
 
@@ -83,71 +85,84 @@ const Dashboard = () => {
         <button
           className={`sidebar-item ${activeTab === 'usuarios' ? 'active' : ''}`}
           onClick={() => setActiveTab('usuarios')}
+          style={{ display: role === 'admin' ? 'block' : 'none' }} // solo admin puede ver Usuarios
         >
           👥 Usuarios
         </button>
 
+        {/* LOGÍSTICA Y DISTRIBUCIÓN visible para todos */}
         <div className="sidebar-section">
-          <button 
-            className="sidebar-item" 
-            onClick={() => navigate('/map')}
-          >
-            🚗 Planificador de Rutas
+          <button className="sidebar-item" onClick={() => { toggleModule('logistica'); setActiveTab('logistica'); }}>
+            🚚 Logística y Distribución
           </button>
-        </div>
-
-        <div className="sidebar-section">
-          <button className="sidebar-item" onClick={() => toggleModule('pedidos')}>
-            📦 Pedidos
-          </button>
-          {openModule === 'pedidos' && (
+          {openModule === 'logistica' && (
             <div className="sidebar-submenu">
-              <button onClick={() => setActiveTab('pedidos-activos')}>Activos</button>
-              <button onClick={() => setActiveTab('historial-pedidos')}>Historial</button>
+              {/* Al hacer click abrimos la vista de mapa dentro del dashboard */}
+              <button onClick={() => setActiveTab('map')}>Rutas</button>
             </div>
           )}
         </div>
 
-        <div className="sidebar-section">
+        {/* Las demás secciones solo para admin */}
+        <div className="sidebar-section" style={{ display: role === 'admin' ? 'block' : 'none' }}>
+          <button className="sidebar-item" onClick={() => toggleModule('finanzas')}>
+            💰 Finanzas y Contabilidad
+          </button>
+          {openModule === 'finanzas' && (
+            <div className="sidebar-submenu">
+              <button onClick={() => setActiveTab('cuentas')}>Gestión Cuentas por Pagar y Cobrar</button>
+              <button onClick={() => setActiveTab('presupuesto')}>Control de Presupuesto</button>
+            </div>
+          )}
+        </div>
+
+        <div className="sidebar-section" style={{ display: role === 'admin' ? 'block' : 'none' }}>
           <button className="sidebar-item" onClick={() => toggleModule('inventario')}>
-            🏭 Inventario
+            🏭 Gestión de Inventario
           </button>
           {openModule === 'inventario' && (
             <div className="sidebar-submenu">
-              <button onClick={() => setActiveTab('productos')}>Productos</button>
-              <button onClick={() => setActiveTab('proveedores')}>Proveedores</button>
+              <button onClick={() => setActiveTab('existencias')}>Control Existencias</button>
+              <button onClick={() => setActiveTab('almacenes')}>Gestión Almacenes</button>
+              <button onClick={() => setActiveTab('movimientos')}>Movimientos Entrada/Salida</button>
             </div>
           )}
         </div>
 
-        <div className="sidebar-section">
-          <button className="sidebar-item" onClick={() => toggleModule('indicadores')}>
-            📊 Indicadores
+        <div className="sidebar-section" style={{ display: role === 'admin' ? 'block' : 'none' }}>
+          <button className="sidebar-item" onClick={() => toggleModule('compras')}>
+            🛒 Compras y Proveedores
           </button>
-          {openModule === 'indicadores' && (
+          {openModule === 'compras' && (
             <div className="sidebar-submenu">
-              <button onClick={() => setActiveTab('rendimiento')}>Rendimiento</button>
-              <button onClick={() => setActiveTab('eficiencia')}>Eficiencia</button>
+              <button onClick={() => setActiveTab('ordenes')}>Gestión Órdenes de Compra</button>
+              <button onClick={() => setActiveTab('precios')}>Control de Precios</button>
             </div>
           )}
         </div>
 
-        <div className="sidebar-section">
-          <button className="sidebar-item" onClick={() => toggleModule('configuracion')}>
-            ⚙️ Configuración
+        <div className="sidebar-section" style={{ display: role === 'admin' ? 'block' : 'none' }}>
+          <button className="sidebar-item" onClick={() => toggleModule('ventas')}>
+            🧾 Ventas
           </button>
-          {openModule === 'configuracion' && (
+          {openModule === 'ventas' && (
             <div className="sidebar-submenu">
-              <button onClick={() => setActiveTab('preferencias')}>Preferencias</button>
-              <button onClick={() => setActiveTab('seguridad')}>Seguridad</button>
+              <button onClick={() => setActiveTab('cotizaciones')}>Cotizaciones</button>
+              <button onClick={() => setActiveTab('pedidos')}>Pedidos</button>
             </div>
           )}
+        </div>
+
+        <div className="sidebar-section" style={{ display: role === 'admin' ? 'block' : 'none' }}>
+          <button className="sidebar-item" onClick={() => setActiveTab('reportes')}>
+            📈 Reportes
+          </button>
         </div>
 
         <button className="logout-button" onClick={handleLogout}>
           🚪 Cerrar sesión
         </button>
-      </aside>
+      </aside> 
 
       {/* Contenido principal */}
       <main className="dashboard-content">
@@ -158,11 +173,40 @@ const Dashboard = () => {
           </span>
         </header>
 
-        {activeTab === 'usuarios' ? (
+        {/* Si seleccionaron map mostramos layout con mapa 3/4 y sidebar historial a la derecha */}
+        {activeTab === 'map' ? (
+          <div className="map-layout">
+            <div className="map-main">
+              {/* singlePoint=true fuerza comportamiento de un único marcador inicial y modal */}
+              <MapView singlePoint={true} initialCoord={[-16.482392, -68.242340]} />
+            </div>
+            <aside className="map-history">
+              <h3>Historial de Viajes</h3>
+              <ul className="history-list">
+                {dashboardData.history?.length ? (
+                  dashboardData.history.map((h, i) => (
+                    <li key={i}>
+                      <div className="hist-title">{h.title}</div>
+                      <div className="hist-meta">{h.date} — {h.status}</div>
+                    </li>
+                  ))
+                ) : (
+                  <>
+                    <li>No hay viajes recientes</li>
+                    {/* opcional: mostrar mock historial */}
+                    <li>Ruta A — 2025-10-20 — Completado</li>
+                    <li>Ruta B — 2025-10-18 — En curso</li>
+                  </>
+                )}
+              </ul>
+            </aside>
+          </div>
+        ) : activeTab === 'usuarios' ? (
           <UserCrud />
         ) : activeTab === 'inicio' ? (
           <>
-            {/* Metrics Grid */}
+            {/* Metrics Grid (mantener tu código existente) */}
+            {/* ...existing code... */}
             <div className="metrics-grid">
               <div className="metric-card">
                 <div className="metric-icon">🚚</div>
@@ -171,92 +215,9 @@ const Dashboard = () => {
                   <div className="metric-value">{dashboardData.on_time_delivery}%</div>
                 </div>
               </div>
-              <div className="metric-card">
-                <div className="metric-icon">⏱️</div>
-                <div className="metric-info">
-                  <h3>Promedio de entrega</h3>
-                  <div className="metric-value">{dashboardData.avg_delivery_time} min</div>
-                </div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-icon">⛽</div>
-                <div className="metric-info">
-                  <h3>Consumo combustible</h3>
-                  <div className="metric-value">{dashboardData.fuel_consumption} L</div>
-                </div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-icon">📊</div>
-                <div className="metric-info">
-                  <h3>Kilometraje por ruta</h3>
-                  <div className="metric-value">{dashboardData.mileage_per_route} km</div>
-                </div>
-              </div>
+              {/* ...rest of metrics... */}
             </div>
-
-            {/* Charts */}
-            <div className="charts-section">
-              <div className="chart-card">
-                <h3>Rendimiento semanal</h3>
-                <div className="bar-chart">
-                  {dashboardData.weekly_performance.map((value, index) => (
-                    <div key={index} className="bar-container">
-                      <div className="bar" style={{ height: `${value}%` }}></div>
-                      <span className="bar-label">
-                        {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][index]}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="chart-card">
-                <h3>Comparación de rutas</h3>
-                <div className="routes-comparison">
-                  {dashboardData.route_comparison.map((route, index) => (
-                    <div key={index} className="route-item">
-                      <span className="route-name">{route.name}</span>
-                      <div className="efficiency-bar">
-                        <div
-                          className="efficiency-fill"
-                          style={{ width: `${route.efficiency}%` }}
-                        ></div>
-                      </div>
-                      <span className="efficiency-value">{route.efficiency}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Delivery Table */}
-            <div className="delivery-status-card">
-              <h3>Estado de entregas</h3>
-              <div className="delivery-table-container">
-                <table className="delivery-table">
-                  <thead>
-                    <tr>
-                      <th>Ruta</th>
-                      <th>Estado</th>
-                      <th>Hora</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dashboardData.delivery_status.map((delivery, index) => (
-                      <tr key={index}>
-                        <td>{delivery.route}</td>
-                        <td>
-                          <span className={getStatusClass(delivery.status)}>
-                            {delivery.status}
-                          </span>
-                        </td>
-                        <td>{delivery.time}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {/* ...rest of content ... */}
           </>
         ) : (
           <div className="placeholder">

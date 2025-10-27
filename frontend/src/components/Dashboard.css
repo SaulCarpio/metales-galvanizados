@@ -190,3 +190,150 @@ body, html {
   margin-top: 50px;
   color: #888;
 }
+
+.map-layout {
+  display: flex;
+  height: calc(100vh - 80px);
+}
+
+.map-main {
+  flex: 3;
+  position: relative;
+}
+
+.map-history {
+  flex: 1;
+  background: #2d2d2d;
+  padding: 20px;
+  overflow-y: auto;
+  color: white;
+}
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.hist-title {
+  font-weight: bold;
+}
+
+.hist-meta {
+  font-size: 0.9em;
+  color: #bbb;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-card {
+  background: white;
+  color: black;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  width: 300px;
+}
+
+.modal-actions button {
+  margin: 5px;
+}
+
+.btn-primary {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 4px;
+}
+
+.btn-secondary {
+  background: #ccc;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 4px;
+}
+
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.truck-marker {
+  font-size: 24px;
+  animation: bounce 0.3s infinite alternate;
+}
+
+@keyframes bounce {
+  from { transform: translateY(0); }
+  to { transform: translateY(-4px); }
+}
+
+.map-error {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f8d7da;
+  color: #721c24;
+  padding: 10px 20px;
+  border-radius: 6px;
+  z-index: 1000;
+}
+
+.map-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255,255,255,0.9);
+  padding: 20px;
+  border-radius: 8px;
+  z-index: 1000;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-card {
+  background: white;
+  color: black;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  width: 300px;
+}
+
+.modal-actions button {
+  margin: 5px;
+}
+
+.btn-primary {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 4px;
+}
+
+.btn-secondary {
+  background: #ccc;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 4px;
+}
