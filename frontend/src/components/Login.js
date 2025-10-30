@@ -1,31 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'; // CORRECCIÓN 1: 'import' en lugar de 'inport'
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 import './Login.css';
 
 const Login = () => {
-  const [credentials, setCredentials] = useState({
-    username: '',
-    password: ''
-  });
-
+  const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showChangeForm, setShowChangeForm] = useState(false);
   const [changeData, setChangeData] = useState({ new_username: '', new_password: '' });
   const [loginUser, setLoginUser] = useState('');
-  const [loginRole, setLoginRole] = useState('');
+  
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleChange = (e) => {
-    setCredentials({
-      ...credentials,
-      [e.target.name]: e.target.value
-    });
-    setError(''); // Limpiar error cuando el usuario escribe
+    setCredentials({ ...credentials, [e.target.name]: e.target.value });
+    setError('');
   };
-
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,28 +28,13 @@ const Login = () => {
     try {
       const response = await authAPI.login(credentials);
       if (response.data.success) {
-        setLoginUser(response.data.user);
-        setLoginRole(response.data.role);
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('username', credentials.username);
-        localStorage.setItem('role', response.data.role); // Guarda el role tal cual lo envía el backend
-        // Log para depuración
-        console.log('Login OK:', {
-          isAuthenticated: localStorage.getItem('isAuthenticated'),
-          username: localStorage.getItem('username'),
-          role: localStorage.getItem('role')
-        });
-        setCredentials({ username: '', password: '' });
+        setLoginUser(credentials.username);
+        login(credentials.username, response.data.role);
+
         if (response.data.change_required) {
           setShowChangeForm(true);
         } else {
-          if (response.data.role === 'admin') {
-            navigate('/dashboard', { replace: true });
-            window.history.pushState(null, '', '/dashboard');
-          } else {
-            navigate('/map', { replace: true });
-            window.history.pushState(null, '', '/map');
-          }
+          navigate('/', { replace: true });
         }
       } else {
         setError(response.data.message || 'Credenciales inválidas');
@@ -67,7 +45,7 @@ const Login = () => {
       setIsLoading(false);
     }
   };
-
+  
   const handleChangeForm = (e) => {
     setChangeData({ ...changeData, [e.target.name]: e.target.value });
     setError('');
@@ -84,13 +62,13 @@ const Login = () => {
         new_password: changeData.new_password,
       });
       if (response.data.success) {
-        localStorage.setItem('username', changeData.new_username);
+        login(changeData.new_username, localStorage.getItem('role'));
         setShowChangeForm(false);
-        navigate('/dashboard');
+        navigate('/', { replace: true });
       } else {
         setError(response.data.message || 'Error al cambiar usuario/contraseña');
       }
-    } catch (error) {
+    } catch (error) { // CORRECCIÓN 2: Se añadió la llave de apertura '{'
       setError(error.response?.data?.message || 'Error de conexión con el servidor');
     } finally {
       setIsLoading(false);
@@ -133,8 +111,8 @@ const Login = () => {
               />
             </div>
             {error && <div className="error-message">{error}</div>}
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isLoading}
               className={isLoading ? 'loading' : ''}
             >
@@ -170,8 +148,8 @@ const Login = () => {
               />
             </div>
             {error && <div className="error-message">{error}</div>}
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isLoading}
               className={isLoading ? 'loading' : ''}
             >

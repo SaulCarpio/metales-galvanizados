@@ -3,7 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://192.168.0.24:8080';
+const API_BASE_URL = 'http://192.168.0.15:8080';
 
 const MapView = ({ singlePoint = false, initialCoord = null }) => {
   const mapRef = useRef(null);
