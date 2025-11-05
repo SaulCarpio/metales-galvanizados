@@ -412,49 +412,120 @@ def health_check():
     })
 
 # =========================
-# ENDPOINTS DE ML Y RUTAS
+# ENDPOINTS DE ML Y RUTAS OPTIMIZADO PARA MÚLTIPLES PUNTOS
 # =========================
 
 @app.route('/api/find-route', methods=['POST'])
 def find_route():
-    """Endpoint optimizado para encontrar la mejor ruta."""
+    """Endpoint para encontrar la mejor ruta entre múltiples puntos (TSP)."""
     start_time = datetime.datetime.now()
     
     try:
         data = request.get_json()
-        origin = data.get('origin')
-        destination = data.get('destination')
+        waypoints = data.get('waypoints', [])
 
-        if not origin or not destination:
+        if not waypoints or len(waypoints) < 2:
             return jsonify({
                 'success': False,
-                'message': 'Se requieren puntos de origen y destino'
+                'message': 'Se requieren al menos 2 puntos de ruta'
             }), 400
 
         # Usar grafo cacheado
         G = init_graph()
 
-        # Encontrar nodos más cercanos
-        orig_node = ox.nearest_nodes(G, origin[1], origin[0])
-        dest_node = ox.nearest_nodes(G, destination[1], destination[0])
+        # Encontrar nodos más cercanos para todos los waypoints
+        waypoint_nodes = []
+        for waypoint in waypoints:
+            node = ox.nearest_nodes(G, waypoint[1], waypoint[0])
+            waypoint_nodes.append(node)
 
-        # Calcular ruta optimizada
-        path, dist, tsec = shortest_route_stats(G, orig_node, dest_node)
+        # El primer punto es el origen/depósito
+        depot_node = waypoint_nodes[0]
         
-        if not path:
-            return jsonify({
-                'success': False,
-                'message': 'No se encontró ruta entre los puntos'
-            }), 404
+        # Si solo hay 2 puntos, calcular ruta directa
+        if len(waypoint_nodes) == 2:
+            path, total_distance, total_time = shortest_route_stats(G, waypoint_nodes[0], waypoint_nodes[1])
+            # Para volver al punto inicial en caso de 2 puntos
+            return_path, return_distance, return_time = shortest_route_stats(G, waypoint_nodes[1], waypoint_nodes[0])
+            
+            # Combinar rutas (ida y vuelta)
+            full_path = path + return_path[1:]  # Evitar duplicar el nodo final
+            total_distance += return_distance
+            total_time += return_time
+            
+        else:
+            # Para 3 o más puntos, resolver TSP
+            # Calcular matriz de distancias entre todos los puntos
+            distance_matrix = []
+            for i in range(len(waypoint_nodes)):
+                row = []
+                for j in range(len(waypoint_nodes)):
+                    if i == j:
+                        row.append(0)
+                    else:
+                        try:
+                            _, dist, _ = shortest_route_stats(G, waypoint_nodes[i], waypoint_nodes[j])
+                            row.append(dist)
+                        except:
+                            # Si no hay ruta, usar una distancia grande
+                            row.append(float('inf'))
+                distance_matrix.append(row)
 
-        # Extraer coordenadas eficientemente
-        route_coords = [[float(G.nodes[node]['y']), float(G.nodes[node]['x'])] for node in path]
+            # Resolver TSP (algoritmo simple - nearest neighbor)
+            def solve_tsp_nearest_neighbor(distance_matrix, depot=0):
+                n = len(distance_matrix)
+                unvisited = set(range(n))
+                unvisited.remove(depot)
+                tour = [depot]
+                current = depot
+                total_distance = 0
 
-        # Predecir tiempo con ML
+                while unvisited:
+                    next_node = min(unvisited, key=lambda x: distance_matrix[current][x])
+                    total_distance += distance_matrix[current][next_node]
+                    tour.append(next_node)
+                    unvisited.remove(next_node)
+                    current = next_node
+
+                # Volver al depósito
+                total_distance += distance_matrix[current][depot]
+                tour.append(depot)
+                
+                return tour, total_distance
+
+            # Obtener tour óptimo
+            optimal_tour, total_distance = solve_tsp_nearest_neighbor(distance_matrix)
+
+            # Construir la ruta completa conectando los segmentos
+            full_path = []
+            total_time = 0
+            
+            for i in range(len(optimal_tour) - 1):
+                start_idx = optimal_tour[i]
+                end_idx = optimal_tour[i + 1]
+                
+                segment_path, segment_dist, segment_time = shortest_route_stats(
+                    G, waypoint_nodes[start_idx], waypoint_nodes[end_idx]
+                )
+                
+                # Para evitar duplicar nodos, omitir el primero en segmentos subsiguientes
+                if full_path:
+                    full_path.extend(segment_path[1:])
+                else:
+                    full_path.extend(segment_path)
+                
+                total_time += segment_time
+
+        # Extraer coordenadas de la ruta completa
+        route_coords = []
+        for node in full_path:
+            route_coords.append([float(G.nodes[node]['y']), float(G.nodes[node]['x'])])
+
+        # Predecir tiempo total con ML
         is_thursday = datetime.datetime.now().weekday() == 3
         pred_time = predict_route_time_ml({
-            'dist_m': dist,
-            'base_time_sec': tsec,
+            'dist_m': total_distance,
+            'base_time_sec': total_time,
             'is_thursday': int(is_thursday)
         })
 
@@ -465,14 +536,17 @@ def find_route():
             'success': True,
             'route': {
                 'coordinates': route_coords,
-                'distance_meters': round(dist, 2),
-                'base_time_sec': round(tsec, 2),
+                'distance_meters': round(total_distance, 2),
+                'base_time_sec': round(total_time, 2),
                 'predicted_time_min': round(pred_time['predicted_time_min'], 2)
             },
             'processing_time_ms': round(processing_time, 2)
         })
 
     except Exception as e:
+        import traceback
+        print(f"Error: {str(e)}")
+        print(traceback.format_exc())
         return jsonify({
             'success': False,
             'message': f'Error al calcular ruta: {str(e)}'
