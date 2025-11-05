@@ -358,6 +358,51 @@ def train_route_model():
 # ENDPOINTS DE DASHBOARD Y OTROS
 # =========================
 
+@app.route('/api/dashboard', methods=['POST'])
+def get_dashboard():
+    """Endpoint para obtener datos del dashboard (solo admin) o mostrar el mapa (usuario)."""
+    data = request.get_json()
+    username = data.get('username')
+    user = User.query.filter_by(nombre=username).first()
+    if not user:
+        return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
+    if user.role.nombre == 'admin':
+        dashboard_data = {
+            "on_time_delivery": random.randint(85, 98),
+            "avg_delivery_time": random.randint(25, 45),
+            "fuel_consumption": random.randint(580, 680),
+            "mileage_per_route": random.randint(300, 350),
+            "weekly_performance": [random.randint(60, 100) for _ in range(7)],
+            "route_comparison": [
+                {"name": "Ruta A", "efficiency": 85},
+                {"name": "Ruta B", "efficiency": 92},
+                {"name": "Ruta C", "efficiency": 78},
+                {"name": "Ruta D", "efficiency": 88}
+            ],
+            "delivery_status": [
+                {"route": "Ruta Norte", "status": "A tiempo", "time": "09:30 AM"},
+                {"route": "Ruta Norte", "status": "Retrasada", "time": "10:45 AM"},
+                {"route": "Ruta Norte", "status": "Retrasada", "time": "11:15 AM"},
+                {"route": "Ruta Norte", "status": "A tiempo", "time": "09:50 AM"},
+                {"route": "Ruta Norte", "status": "A tiempo", "time": "10:20 AM"},
+                {"route": "Ruta Norte", "status": "Retrasada", "time": "11:30 AM"}
+            ]
+        }
+        return jsonify({'success': True, 'data': dashboard_data, 'show_map': False})
+    else:
+        return jsonify({'success': True, 'show_map': True})
+
+@app.route('/api/routes', methods=['GET'])
+def get_routes():
+    """Endpoint para obtener información de rutas (mock)."""
+    routes = [
+        {"id": 1, "name": "Ruta Norte", "driver": "Juan Pérez", "status": "En camino"},
+        {"id": 2, "name": "Ruta Sur", "driver": "María García", "status": "Completada"},
+        {"id": 3, "name": "Ruta Este", "driver": "Carlos López", "status": "Pendiente"},
+        {"id": 4, "name": "Ruta Oeste", "driver": "Ana Martínez", "status": "En camino"}
+    ]
+    return jsonify({'success': True, 'routes': routes})
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar que el API está funcionando."""
@@ -580,6 +625,7 @@ def delete_pedido(pid):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
+
 
 
 # =========================
