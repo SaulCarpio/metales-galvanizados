@@ -1,90 +1,154 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import './Pedidos.css'; // Importa el archivo CSS
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://192.168.0.24:8080';
 
+const initialFormState = {
+  nroProforma: '',
+  cliente: '',
+  vendedor: '',
+  fecha: '',
+  producto: '',
+  color: '',
+  cantidad: '',
+  longitud: '',
+  precioUnitario: '',
+  total: '',
+};
+
 const Pedidos = () => {
   const [list, setList] = useState([]);
-  const [detalles, setDetalles] = useState([]);
-  const [clienteId, setClienteId] = useState('');
+  const [formData, setFormData] = useState(initialFormState);
   const [loading, setLoading] = useState(false);
 
-  const fetch = async () => {
+  const fetchPedidos = async () => {
     setLoading(true);
     try {
       const r = await axios.get(`${API_BASE}/api/pedidos`);
       setList(r.data.pedidos || []);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(()=>{ fetch(); }, []);
+  useEffect(() => {
+    fetchPedidos();
+  }, []);
 
-  const addDetalle = () => setDetalles(d=>[...d, {producto_id:'', cantidad:1, subtotal:0}]);
-  const updateDetalle = (i, key, val) => setDetalles(d=>d.map((it,idx)=> idx===i ? {...it, [key]: val} : it));
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
-  const savePedido = async () => {
-    const total = detalles.reduce((s,d)=> s + (Number(d.subtotal)||0), 0);
+  const handleSavePedido = async (e) => {
+    e.preventDefault();
     try {
-      await axios.post(`${API_BASE}/api/pedidos`, {
-        cliente_id: clienteId,
+      // Adapta la estructura de 'formData' a lo que tu API espera
+      const pedidoData = {
+        cliente_id: formData.cliente, // Asumiendo que 'cliente' es el ID
         estado: 'pendiente',
         prioridad: 'normal',
-        total,
-        detalles
-      });
-      setClienteId(''); setDetalles([]); fetch();
-    } catch (e) { console.error(e); }
+        total: formData.total,
+        detalles: [
+          {
+            // Asume que tienes una forma de obtener el ID del producto
+            producto_id: formData.producto,
+            cantidad: formData.cantidad,
+            subtotal: formData.total, // O como lo calcules
+          },
+        ],
+      };
+      await axios.post(`${API_BASE}/api/pedidos`, pedidoData);
+      setFormData(initialFormState);
+      fetchPedidos();
+    } catch (error) {
+      console.error('Error al guardar el pedido:', error);
+    }
   };
 
-  const remove = async (id) => {
-    if (!window.confirm('Eliminar pedido?')) return;
-    await axios.delete(`${API_BASE}/api/pedidos/${id}`);
-    fetch();
+  const handleClearForm = () => {
+    setFormData(initialFormState);
+  };
+
+  const handleRemovePedido = async (id) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar este pedido?')) {
+      try {
+        await axios.delete(`${API_BASE}/api/pedidos/${id}`);
+        fetchPedidos();
+      } catch (error) {
+        console.error('Error al eliminar el pedido:', error);
+      }
+    }
   };
 
   return (
-    <div>
-      <h2>Pedidos</h2>
-      <div style={{display:'flex',gap:12}}>
-        <div style={{flex:1}}>
-          <h4>Crear Pedido</h4>
-          <input placeholder="Cliente ID" value={clienteId} onChange={e=>setClienteId(e.target.value)} />
-          <div>
-            <h5>Detalles</h5>
-            {detalles.map((d,i)=>(
-              <div key={i} style={{display:'flex',gap:8,alignItems:'center',marginBottom:6}}>
-                <input placeholder="Producto ID" value={d.producto_id} onChange={e=>updateDetalle(i,'producto_id',e.target.value)} />
-                <input placeholder="Cantidad" type="number" value={d.cantidad} onChange={e=>updateDetalle(i,'cantidad',e.target.value)} />
-                <input placeholder="Subtotal" value={d.subtotal} onChange={e=>updateDetalle(i,'subtotal',e.target.value)} />
-                <button onClick={()=>setDetalles(ds=>ds.filter((_,idx)=>idx!==i))}>Quitar</button>
+    <div className="pedidos-container">
+      <div className="form-layout">
+        <h2 className="form-title">NUEVA NOTA DE VENTA</h2>
+        <form onSubmit={handleSavePedido}>
+          <input 
+            type="text" 
+            name="nroProforma" 
+            value={formData.nroProforma} 
+            onChange={handleInputChange} 
+            onKeyPress={(e) => {
+              // Solo permite números
+              if (!/[0-9]/.test(e.key)) {
+                e.preventDefault();
+              }
+            }}
+            placeholder="Nro. Proforma" 
+            className="form-edit-text" 
+          />
+          
+          <input type="text" name="cliente" value={formData.cliente} onChange={handleInputChange} placeholder="Cliente" className="form-edit-text" />
+          <input type="text" name="vendedor" value={formData.vendedor} onChange={handleInputChange} placeholder="Vendedor" className="form-edit-text" />
+          
+          <input 
+            type="date" 
+            name="fecha" 
+            value={formData.fecha} 
+            onChange={handleInputChange} 
+            className="form-edit-text" 
+          />
+          
+          {/* Aquí podrías tener un select/options para productos si los cargas desde la API */}
+          <input type="text" name="producto" value={formData.producto} onChange={handleInputChange} placeholder="Producto" className="form-edit-text" />
+          <input type="text" name="color" value={formData.color} onChange={handleInputChange} placeholder="Color" className="form-edit-text" />
+          <input type="number" name="cantidad" value={formData.cantidad} onChange={handleInputChange} placeholder="Cantidad" className="form-edit-text" />
+          <input type="number" name="longitud" value={formData.longitud} onChange={handleInputChange} placeholder="Longitud (m)" className="form-edit-text" />
+          <input type="number" name="precioUnitario" value={formData.precioUnitario} onChange={handleInputChange} placeholder="Precio Unitario Bs" className="form-edit-text" />
+          <input type="number" name="total" value={formData.total} onChange={handleInputChange} placeholder="Total Bs" className="form-edit-text" />
+
+          <div className="action-buttons">
+            <button type="submit" className="btn-guardar">Guardar</button>
+            <button type="button" onClick={handleClearForm} className="btn-limpiar">Limpiar</button>
+          </div>
+        </form>
+      </div>
+
+      <div className="list-layout">
+        <h2 className="list-title">NOTAS GUARDADAS</h2>
+        {loading ? (
+          <p>Cargando...</p>
+        ) : (
+          <div className="recycler-view">
+            {list.map((p) => (
+              <div key={p.id} className="list-item">
+                <div className="item-details">
+                  <p><b>ID:</b> {p.id}</p>
+                  <p><b>Cliente:</b> {p.cliente_id}</p>
+                  <p><b>Total:</b> {p.total}</p>
+                  <p><b>Estado:</b> {p.estado}</p>
+                </div>
+                <button onClick={() => handleRemovePedido(p.id)} className="btn-eliminar">Eliminar</button>
               </div>
             ))}
-            <button onClick={addDetalle}>Agregar detalle</button>
           </div>
-          <div style={{marginTop:8}}>
-            <button onClick={savePedido}>Crear Pedido</button>
-          </div>
-        </div>
-
-        <div style={{flex:2}}>
-          <h4>Lista de Pedidos</h4>
-          {loading ? <p>Cargando...</p> : (
-            <table style={{width:'100%'}}>
-              <thead><tr><th>ID</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Acción</th></tr></thead>
-              <tbody>
-                {list.map(p=>(
-                  <tr key={p.id}>
-                    <td>{p.id}</td>
-                    <td>{p.cliente_id}</td>
-                    <td>{p.total}</td>
-                    <td>{p.estado}</td>
-                    <td><button onClick={()=>remove(p.id)}>Eliminar</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

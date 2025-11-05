@@ -1,100 +1,224 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
+import './Cotizaciones.css'; // Importa el nuevo archivo CSS
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://192.168.0.24:8080';
+// Componente para una fila de la tabla de detalles
+const DetalleRow = ({ item, onChange, onRemove }) => (
+  <div className="detalle-row">
+    <input
+      type="number"
+      placeholder="Cant."
+      value={item.cantidad}
+      onChange={(e) => onChange(item.id, 'cantidad', e.target.value)}
+      className="detalle-input"
+    />
+    <input
+      type="number"
+      placeholder="Longitud (m)"
+      value={item.longitud}
+      onChange={(e) => onChange(item.id, 'longitud', e.target.value)}
+      className="detalle-input"
+    />
+    <span className="subtotal-mts">
+      Subtotal: {(Number(item.cantidad) * Number(item.longitud)).toFixed(2)} mts
+    </span>
+    <button onClick={() => onRemove(item.id)} className="btn-remove-row">
+      &times;
+    </button>
+  </div>
+);
 
-const emptyForm = { cliente_id: '', nombre_cliente: '', producto: '', color: '', fecha_expiracion: '', precio_unitario: '', cantidad: '', estado: 'emitida' };
 
 const Cotizaciones = () => {
-  const [list, setList] = useState([]);
-  const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState(null);
-  const [loading, setLoading] = useState(false);
+  // Estado para los campos principales
+  const [cliente, setCliente] = useState('');
+  const [producto, setProducto] = useState('');
+  const [color, setColor] = useState('');
 
-  const fetch = async () => {
-    setLoading(true);
-    try {
-      const r = await axios.get(`${API_BASE}/api/cotizaciones`);
-      setList(r.data.cotizaciones || []);
-    } catch (e) {
-      console.error(e);
-    } finally { setLoading(false); }
+  // Estado para la visibilidad de las secciones
+  const [showCalaminas, setShowCalaminas] = useState(false);
+  const [showCumbreras, setShowCumbreras] = useState(false);
+
+  // Estado para los detalles
+  const [calaminas, setCalaminas] = useState([]);
+  const [cumbreras, setCumbreras] = useState([]);
+
+  // Estado para los totales
+  const [totalMtsCalaminas, setTotalMtsCalaminas] = useState(0);
+  const [totalMtsCumbreras, setTotalMtsCumbreras] = useState(0);
+
+  // --- Lógica para manipular detalles ---
+
+  const addDetalle = (tipo) => {
+    const newItem = { id: Date.now(), cantidad: '', longitud: '' };
+    if (tipo === 'calamina') {
+      setCalaminas([...calaminas, newItem]);
+    } else {
+      setCumbreras([...cumbreras, newItem]);
+    }
   };
 
-  useEffect(() => { fetch(); }, []);
+  const updateDetalle = (id, tipo, field, value) => {
+    const updater = (items) =>
+      items.map((item) => (item.id === id ? { ...item, [field]: value } : item));
 
-  const save = async () => {
-    try {
-      if (editingId) {
-        await axios.put(`${API_BASE}/api/cotizaciones/${editingId}`, form);
-      } else {
-        await axios.post(`${API_BASE}/api/cotizaciones`, form);
-      }
-      setForm(emptyForm); setEditingId(null); fetch();
-    } catch (e) { console.error(e); }
+    if (tipo === 'calamina') {
+      setCalaminas(updater);
+    } else {
+      setCumbreras(updater);
+    }
   };
 
-  const edit = (c) => {
-    setEditingId(c.id);
-    setForm({
-      cliente_id: c.cliente_id || '',
-      nombre_cliente: c.nombre_cliente || '',
-      producto: c.producto || '',
-      color: c.color || '',
-      fecha_expiracion: c.fecha_expiracion || '',
-      precio_unitario: c.precio_unitario || '',
-      cantidad: c.cantidad || '',
-      estado: c.estado || 'emitida'
-    });
+  const removeDetalle = (id, tipo) => {
+    if (tipo === 'calamina') {
+      setCalaminas(calaminas.filter((item) => item.id !== id));
+    } else {
+      setCumbreras(cumbreras.filter((item) => item.id !== id));
+    }
   };
 
-  const remove = async (id) => {
-    if (!window.confirm('Eliminar cotización?')) return;
-    await axios.delete(`${API_BASE}/api/cotizaciones/${id}`);
-    fetch();
+  // --- Efectos para calcular totales ---
+
+  useEffect(() => {
+    const total = calaminas.reduce(
+      (sum, item) => sum + Number(item.cantidad) * Number(item.longitud),
+      0
+    );
+    setTotalMtsCalaminas(total);
+  }, [calaminas]);
+
+  useEffect(() => {
+    const total = cumbreras.reduce(
+      (sum, item) => sum + Number(item.cantidad) * Number(item.longitud),
+      0
+    );
+    setTotalMtsCumbreras(total);
+  }, [cumbreras]);
+  
+  // --- Lógica de los botones principales ---
+
+  const handleLimpiar = () => {
+    setCliente('');
+    setProducto('');
+    setColor('');
+    setShowCalaminas(false);
+    setShowCumbreras(false);
+    setCalaminas([]);
+    setCumbreras([]);
   };
+
+  const handleCopiar = () => {
+    let cotizacionTexto = `*COTIZACIÓN - MEGACERO S.R.L.*\n\n`;
+    cotizacionTexto += `*Cliente:* ${cliente || 'N/A'}\n`;
+    cotizacionTexto += `*Producto:* ${producto || 'N/A'}\n`;
+    cotizacionTexto += `*Color:* ${color || 'N/A'}\n\n`;
+
+    if (showCalaminas && calaminas.length > 0) {
+      cotizacionTexto += `*--- Calaminas ---*\n`;
+      calaminas.forEach(c => {
+        cotizacionTexto += `- ${c.cantidad}u de ${c.longitud}m = ${(c.cantidad * c.longitud).toFixed(2)} mts\n`;
+      });
+      cotizacionTexto += `*TOTAL MTS. CALAMINAS: ${totalMtsCalaminas.toFixed(2)}*\n\n`;
+    }
+
+    if (showCumbreras && cumbreras.length > 0) {
+      cotizacionTexto += `*--- Cumbreras ---*\n`;
+      cumbreras.forEach(c => {
+        cotizacionTexto += `- ${c.cantidad}u de ${c.longitud}m = ${(c.cantidad * c.longitud).toFixed(2)} mts\n`;
+      });
+      cotizacionTexto += `*TOTAL MTS. CUMBRERAS: ${totalMtsCumbreras.toFixed(2)}*\n\n`;
+    }
+
+    cotizacionTexto += `*TOTAL GENERAL MTS.: ${(totalMtsCalaminas + totalMtsCumbreras).toFixed(2)}*`;
+    
+    navigator.clipboard.writeText(cotizacionTexto)
+      .then(() => alert('¡Cotización copiada al portapapeles!'))
+      .catch(err => console.error('Error al copiar:', err));
+  };
+
 
   return (
-    <div>
-      <h2>Cotizaciones</h2>
-      <div style={{display:'flex',gap:12}}>
-        <div style={{flex:1}}>
-          <h4>{editingId ? 'Editar' : 'Nueva Cotización'}</h4>
-          <input placeholder="Nombre cliente" value={form.nombre_cliente} onChange={e=>setForm({...form,nombre_cliente:e.target.value})} />
-          <input placeholder="Producto" value={form.producto} onChange={e=>setForm({...form,producto:e.target.value})} />
-          <input placeholder="Color" value={form.color} onChange={e=>setForm({...form,color:e.target.value})} />
-          <input placeholder="Precio unitario" value={form.precio_unitario} onChange={e=>setForm({...form,precio_unitario:e.target.value})} />
-          <input placeholder="Cantidad" value={form.cantidad} onChange={e=>setForm({...form,cantidad:e.target.value})} />
-          <input type="date" value={form.fecha_expiracion} onChange={e=>setForm({...form,fecha_expiracion:e.target.value})} />
-          <div style={{marginTop:8}}>
-            <button onClick={save}>{editingId ? 'Actualizar' : 'Crear'}</button>
-            <button onClick={()=>{setForm(emptyForm); setEditingId(null);}}>Cancelar</button>
-          </div>
+    <div className="cotizador-container">
+      <div className="cotizador-form">
+        <h1 className="header-title">COTIZADOR - MEGACERO S.R.L.</h1>
+
+        <input
+          type="text"
+          id="etCliente"
+          placeholder="Nombre del cliente"
+          value={cliente}
+          onChange={(e) => setCliente(e.target.value)}
+          className="form-input"
+        />
+
+        {/* Simulación de Spinners con <select> */}
+        <select id="spinnerProducto" value={producto} onChange={e => setProducto(e.target.value)} className="form-input">
+          <option value="Ondulado T-35">Ondulado</option>
+          <option value="Trapezoidal">Trapezoidal</option>
+          <option value="Teja Colonial">Teja Colonial</option>
+          <option value="Teja Americana">Teja Americana</option>
+        </select>
+
+        <select id="spinnerColor" value={color} onChange={e => setColor(e.target.value)} className="form-input">
+          <option value="Rojo">Rojo</option>
+          <option value="Azul">Azul</option>
+          <option value="Naranja">Naranja</option>
+          <option value="Turquesa">Turquesa</option>
+          <option value="Verde">Verde</option>
+          <option value="Vino Shingle">Vino Shingle</option>
+          <option value="Cafe Shingle">Cafe Shingle</option>
+          <option value="Rojo Shingle">Rojo Shingle</option>
+          <option value="Naranja Shingle">Naranja Shingle</option>
+          <option value="Zincalum">Zincalum</option>
+        </select>
+        
+        <div className="checkbox-container">
+          <label>
+            <input type="checkbox" id="checkCalamina" checked={showCalaminas} onChange={e => setShowCalaminas(e.target.checked)} />
+            Calaminas
+          </label>
+          <label>
+            <input type="checkbox" id="checkPlanas" checked={showCumbreras} onChange={e => setShowCumbreras(e.target.checked)} />
+            Cumbreras
+          </label>
         </div>
 
-        <div style={{flex:2}}>
-          <h4>Lista</h4>
-          {loading ? <p>Cargando...</p> : (
-            <table style={{width:'100%'}}>
-              <thead><tr><th>ID</th><th>Cliente</th><th>Producto</th><th>Cant.</th><th>Precio</th><th>Estado</th><th>Acción</th></tr></thead>
-              <tbody>
-                {list.map(c=>(
-                  <tr key={c.id}>
-                    <td>{c.id}</td>
-                    <td>{c.nombre_cliente}</td>
-                    <td>{c.producto}</td>
-                    <td>{c.cantidad}</td>
-                    <td>{c.precio_unitario}</td>
-                    <td>{c.estado}</td>
-                    <td>
-                      <button onClick={()=>edit(c)}>Editar</button>
-                      <button onClick={()=>remove(c.id)}>Eliminar</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        {/* Sección Calaminas */}
+        {showCalaminas && (
+          <div className="detalle-section">
+            <h2 className="detalle-title">Calaminas</h2>
+            <div className="detalle-table">
+              {calaminas.map(item => (
+                <DetalleRow key={item.id} item={item}
+                  onChange={(id, field, value) => updateDetalle(id, 'calamina', field, value)}
+                  onRemove={(id) => removeDetalle(id, 'calamina')} />
+              ))}
+            </div>
+            <p className="total-mts">TOTAL MTS.: {totalMtsCalaminas.toFixed(2)}</p>
+            <button onClick={() => addDetalle('calamina')} className="btn-agregar">+ Agregar Calamina</button>
+          </div>
+        )}
+
+        {/* Sección Cumbreras */}
+        {showCumbreras && (
+          <div className="detalle-section">
+            <h2 className="detalle-title">Cumbreras</h2>
+             <div className="detalle-table">
+              {cumbreras.map(item => (
+                <DetalleRow key={item.id} item={item}
+                  onChange={(id, field, value) => updateDetalle(id, 'cumbrera', field, value)}
+                  onRemove={(id) => removeDetalle(id, 'cumbrera')} />
+              ))}
+            </div>
+            <p className="total-mts">TOTAL MTS.: {totalMtsCumbreras.toFixed(2)}</p>
+            <button onClick={() => addDetalle('cumbrera')} className="btn-agregar">+ Agregar Cumbrera</button>
+          </div>
+        )}
+
+        <p className="total-general">TOTAL GENERAL: {(totalMtsCalaminas + totalMtsCumbreras).toFixed(2)} MTS.</p>
+        
+        <div className="final-buttons-container">
+          <button onClick={handleCopiar} className="btn-copiar">📋 Copiar</button>
+          <button onClick={handleLimpiar} className="btn-limpiar-final">🗑️ Limpiar</button>
         </div>
       </div>
     </div>

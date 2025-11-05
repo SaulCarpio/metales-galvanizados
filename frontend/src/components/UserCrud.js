@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { authAPI } from '../utils/api';
 import './Dashboard.css';
-
+import './UserCrud.css';
 const UserCrud = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);

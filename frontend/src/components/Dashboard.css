@@ -5,7 +5,7 @@
   --text-light: #e0e1dd;
   --text-muted: #a5a5a5;
   --accent: #0077b6;
-  --card-bg: #f9f9f9;
+  --card-bg: #ffffff;
 }
 
 body, html {
@@ -18,9 +18,11 @@ body, html {
 .dashboard {
   display: flex;
   height: 100vh;
+  width: 100vw;
+  overflow: hidden;
 }
 
-/* Sidebar */
+/* --- Sidebar --- */
 .sidebar {
   width: 240px;
   background-color: var(--sidebar-bg);
@@ -28,13 +30,14 @@ body, html {
   display: flex;
   flex-direction: column;
   padding: 20px 10px;
+  flex-shrink: 0;
 }
 
 .sidebar-title {
   text-align: center;
   margin-bottom: 1rem;
   font-size: 1.2rem;
-  color: var(--text-muted);
+  color: var(--text-light);
 }
 
 .sidebar-item {
@@ -42,12 +45,15 @@ body, html {
   border: none;
   color: var(--text-light);
   text-align: left;
-  padding: 10px;
+  padding: 10px 15px; /* Más padding para los emojis */
   width: 100%;
   font-size: 15px;
   cursor: pointer;
   border-radius: 6px;
   transition: background 0.2s;
+  display: flex; /* Para alinear emojis y texto */
+  align-items: center;
+  gap: 10px; /* Espacio entre emoji y texto */
 }
 
 .sidebar-item:hover {
@@ -91,109 +97,36 @@ body, html {
   background-color: #e5383b;
 }
 
-/* Header */
+/* --- Main Content Area --- */
+.dashboard-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
 .dashboard-header {
+  padding: 20px 30px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   color: #14213d;
-  margin-bottom: 25px;
-}
-
-.welcome-text {
-  font-size: 14px;
-  color: #555;
-}
-
-/* Main content */
-.dashboard-content {
-  flex: 1;
-  padding: 30px;
-  overflow-y: auto;
   background-color: #fff;
+  border-bottom: 1px solid #e0e1dd;
+  flex-shrink: 0;
 }
 
-/* Metric cards */
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
+.dashboard-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
 }
 
-.metric-card {
-  background: var(--card-bg);
-  border-radius: 10px;
-  padding: 15px;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-
-.metric-icon {
-  font-size: 30px;
-  margin-right: 10px;
-}
-
-.metric-value {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-/* Charts */
-.charts-section {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-top: 25px;
-}
-
-.chart-card {
-  background: var(--card-bg);
-  border-radius: 10px;
-  padding: 15px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-
-/* Delivery table */
-.delivery-status-card {
-  background: var(--card-bg);
-  border-radius: 10px;
-  padding: 15px;
-  margin-top: 25px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-
-.delivery-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.delivery-table th, .delivery-table td {
-  padding: 8px;
-  border-bottom: 1px solid #ddd;
-  text-align: left;
-}
-
-.status-on-time {
-  color: green;
-  font-weight: bold;
-}
-
-.status-delayed {
-  color: red;
-  font-weight: bold;
-}
-
-.placeholder {
-  text-align: center;
-  margin-top: 50px;
-  color: #888;
-}
-
+/* --- Areglo para el Layout del Mapa --- */
 .map-layout {
   display: flex;
-  height: calc(100vh - 80px);
+  flex-grow: 1; /* Ocupa todo el espacio vertical y horizontal */
+  overflow: hidden;
 }
 
 .map-main {
@@ -207,6 +140,9 @@ body, html {
   padding: 20px;
   overflow-y: auto;
   color: white;
+  min-width: 250px;
+  max-width: 350px;
+  border-left: 1px solid #444;
 }
 
 .history-list {
@@ -214,126 +150,89 @@ body, html {
   padding: 0;
   margin: 0;
 }
-
-.hist-title {
-  font-weight: bold;
-}
-
-.hist-meta {
-  font-size: 0.9em;
-  color: #bbb;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.modal-card {
-  background: white;
-  color: black;
-  padding: 20px;
-  border-radius: 8px;
-  text-align: center;
-  width: 300px;
-}
-
-.modal-actions button {
-  margin: 5px;
-}
-
-.btn-primary {
-  background: #3498db;
-  color: white;
-  border: none;
-  padding: 8px 14px;
-  border-radius: 4px;
-}
-
-.btn-secondary {
-  background: #ccc;
-  border: none;
-  padding: 8px 14px;
-  border-radius: 4px;
-}
+.history-list li { margin-bottom: 15px; }
+.hist-title { font-weight: bold; }
+.hist-meta { font-size: 0.9em; color: #bbb; }
 
 .leaflet-container {
   width: 100%;
   height: 100%;
-  z-index: 0;
 }
 
-.truck-marker {
-  font-size: 24px;
-  animation: bounce 0.3s infinite alternate;
+/* --- Arreglo para TODOS los demás módulos --- */
+.placeholder, 
+.pedidos-container, 
+.cotizador-container, 
+.user-crud-container {
+  background-color: #f4f6fa;
+  flex-grow: 1; /* Clave: Hace que el contenedor crezca para llenar el espacio */
+  overflow-y: auto; /* Clave: Añade scroll SÓLO a esta área si es necesario */
+  padding: 30px;
 }
 
-@keyframes bounce {
-  from { transform: translateY(0); }
-  to { transform: translateY(-4px); }
+/* --- Estilos para el Dashboard de Inicio --- */
+.inicio-dashboard {
+  width: 100%;
 }
 
-.map-error {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #f8d7da;
-  color: #721c24;
-  padding: 10px 20px;
-  border-radius: 6px;
-  z-index: 1000;
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
 }
 
-.map-loading {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(255,255,255,0.9);
+.stat-card {
+  background-color: #ffffff;
   padding: 20px;
   border-radius: 8px;
-  z-index: 1000;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  border-left: 5px solid var(--accent);
 }
 
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
+.stat-card h3 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  color: #555;
 }
 
-.modal-card {
-  background: white;
-  color: black;
+.stat-card p {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: #333;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 20px;
+}
+
+.chart-container {
+  background-color: #ffffff;
   padding: 20px;
   border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+}
+
+.chart-container h4 {
+  margin-top: 0;
   text-align: center;
-  width: 300px;
+  color: #666;
 }
 
-.modal-actions button {
-  margin: 5px;
-}
-
-.btn-primary {
-  background: #3498db;
-  color: white;
-  border: none;
-  padding: 8px 14px;
+.chart-placeholder {
+  width: 100%;
+  height: 300px;
+  background-color: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #aaa;
   border-radius: 4px;
 }
 
-.btn-secondary {
-  background: #ccc;
-  border: none;
-  padding: 8px 14px;
-  border-radius: 4px;
+.chart-placeholder::after {
+  content: 'Gráfico en Construcción';
 }
