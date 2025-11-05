@@ -593,5 +593,3 @@ class CodigosVerificacion(db.Model):
     expiracion = db.Column(db.DateTime, nullable=False)
     usado = db.Column(db.Boolean, default=False)
     usuario = db.relationship('User', backref='codigos_verificacion')
-
-# ...existing code...

@@ -16,6 +16,7 @@ import joblib
 import numpy as np
 import osmnx as ox
 import networkx as nx
+from models import db, User, Role, CodigosVerificacion, Cotizacion, Pedido, PedidoDetalle
 from ml.ruta_modelo import load_graph_z16, shortest_route_stats, ensure_edge_speeds
 
 # =========================
@@ -357,51 +358,6 @@ def train_route_model():
 # ENDPOINTS DE DASHBOARD Y OTROS
 # =========================
 
-@app.route('/api/dashboard', methods=['POST'])
-def get_dashboard():
-    """Endpoint para obtener datos del dashboard (solo admin) o mostrar el mapa (usuario)."""
-    data = request.get_json()
-    username = data.get('username')
-    user = User.query.filter_by(nombre=username).first()
-    if not user:
-        return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
-    if user.role.nombre == 'admin':
-        dashboard_data = {
-            "on_time_delivery": random.randint(85, 98),
-            "avg_delivery_time": random.randint(25, 45),
-            "fuel_consumption": random.randint(580, 680),
-            "mileage_per_route": random.randint(300, 350),
-            "weekly_performance": [random.randint(60, 100) for _ in range(7)],
-            "route_comparison": [
-                {"name": "Ruta A", "efficiency": 85},
-                {"name": "Ruta B", "efficiency": 92},
-                {"name": "Ruta C", "efficiency": 78},
-                {"name": "Ruta D", "efficiency": 88}
-            ],
-            "delivery_status": [
-                {"route": "Ruta Norte", "status": "A tiempo", "time": "09:30 AM"},
-                {"route": "Ruta Norte", "status": "Retrasada", "time": "10:45 AM"},
-                {"route": "Ruta Norte", "status": "Retrasada", "time": "11:15 AM"},
-                {"route": "Ruta Norte", "status": "A tiempo", "time": "09:50 AM"},
-                {"route": "Ruta Norte", "status": "A tiempo", "time": "10:20 AM"},
-                {"route": "Ruta Norte", "status": "Retrasada", "time": "11:30 AM"}
-            ]
-        }
-        return jsonify({'success': True, 'data': dashboard_data, 'show_map': False})
-    else:
-        return jsonify({'success': True, 'show_map': True})
-
-@app.route('/api/routes', methods=['GET'])
-def get_routes():
-    """Endpoint para obtener información de rutas (mock)."""
-    routes = [
-        {"id": 1, "name": "Ruta Norte", "driver": "Juan Pérez", "status": "En camino"},
-        {"id": 2, "name": "Ruta Sur", "driver": "María García", "status": "Completada"},
-        {"id": 3, "name": "Ruta Este", "driver": "Carlos López", "status": "Pendiente"},
-        {"id": 4, "name": "Ruta Oeste", "driver": "Ana Martínez", "status": "En camino"}
-    ]
-    return jsonify({'success': True, 'routes': routes})
-
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar que el API está funcionando."""
@@ -410,6 +366,221 @@ def health_check():
         'timestamp': datetime.datetime.now().isoformat(),
         'service': 'Metales Galvanizados API'
     })
+
+# -------------------------
+# CRUD Cotizaciones
+# -------------------------
+@app.route('/api/cotizaciones', methods=['GET'])
+def list_cotizaciones():
+    try:
+        cotizaciones = Cotizacion.query.order_by(Cotizacion.fecha_emitida.desc()).all()
+        data = [{
+            'id': c.id,
+            'cliente_id': c.cliente_id,
+            'nombre_cliente': c.nombre_cliente,
+            'producto': c.producto,
+            'color': c.color,
+            'fecha_emitida': c.fecha_emitida.isoformat() if c.fecha_emitida else None,
+            'fecha_expiracion': c.fecha_expiracion.isoformat() if c.fecha_expiracion else None,
+            'precio_unitario': float(c.precio_unitario) if c.precio_unitario is not None else None,
+            'cantidad': float(c.cantidad) if c.cantidad is not None else None,
+            'estado': c.estado,
+            'usuario_id': c.usuario_id
+        } for c in cotizaciones]
+        return jsonify({'success': True, 'cotizaciones': data})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/cotizaciones/<int:cid>', methods=['GET'])
+def get_cotizacion(cid):
+    c = Cotizacion.query.get(cid)
+    if not c:
+        return jsonify({'success': False, 'message': 'Cotización no encontrada'}), 404
+    data = {
+        'id': c.id,
+        'cliente_id': c.cliente_id,
+        'nombre_cliente': c.nombre_cliente,
+        'producto': c.producto,
+        'color': c.color,
+        'fecha_emitida': c.fecha_emitida.isoformat() if c.fecha_emitida else None,
+        'fecha_expiracion': c.fecha_expiracion.isoformat() if c.fecha_expiracion else None,
+        'precio_unitario': float(c.precio_unitario) if c.precio_unitario is not None else None,
+        'cantidad': float(c.cantidad) if c.cantidad is not None else None,
+        'estado': c.estado,
+        'usuario_id': c.usuario_id
+    }
+    return jsonify({'success': True, 'cotizacion': data})
+
+@app.route('/api/cotizaciones', methods=['POST'])
+def create_cotizacion():
+    try:
+        payload = request.get_json()
+        c = Cotizacion(
+            cliente_id=payload.get('cliente_id'),
+            nombre_cliente=payload.get('nombre_cliente'),
+            producto=payload.get('producto'),
+            color=payload.get('color'),
+            fecha_expiracion=payload.get('fecha_expiracion'),
+            precio_unitario=payload.get('precio_unitario'),
+            cantidad=payload.get('cantidad'),
+            estado=payload.get('estado', 'emitida'),
+            usuario_id=payload.get('usuario_id')
+        )
+        db.session.add(c)
+        db.session.commit()
+        return jsonify({'success': True, 'id': c.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/cotizaciones/<int:cid>', methods=['PUT'])
+def update_cotizacion(cid):
+    try:
+        c = Cotizacion.query.get(cid)
+        if not c:
+            return jsonify({'success': False, 'message': 'Cotización no encontrada'}), 404
+        payload = request.get_json()
+        for field in ['cliente_id','nombre_cliente','producto','color','fecha_expiracion','precio_unitario','cantidad','estado','usuario_id']:
+            if field in payload:
+                setattr(c, field, payload.get(field))
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/cotizaciones/<int:cid>', methods=['DELETE'])
+def delete_cotizacion(cid):
+    try:
+        c = Cotizacion.query.get(cid)
+        if not c:
+            return jsonify({'success': False, 'message': 'Cotización no encontrada'}), 404
+        db.session.delete(c)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# -------------------------
+# CRUD Pedidos (y detalles)
+# -------------------------
+@app.route('/api/pedidos', methods=['GET'])
+def list_pedidos():
+    try:
+        pedidos = Pedido.query.order_by(Pedido.fecha_pedido.desc()).all()
+        data = []
+        for p in pedidos:
+            detalles = PedidoDetalle.query.filter_by(pedido_id=p.id).all()
+            detalles_list = [{
+                'id': d.id, 'producto_id': d.producto_id, 'cantidad': int(d.cantidad), 'subtotal': float(d.subtotal)
+            } for d in detalles]
+            data.append({
+                'id': p.id,
+                'cliente_id': p.cliente_id,
+                'fecha_pedido': p.fecha_pedido.isoformat() if p.fecha_pedido else None,
+                'estado': p.estado,
+                'prioridad': p.prioridad,
+                'total': float(p.total) if p.total is not None else None,
+                'detalles': detalles_list
+            })
+        return jsonify({'success': True, 'pedidos': data})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/pedidos/<int:pid>', methods=['GET'])
+def get_pedido(pid):
+    p = Pedido.query.get(pid)
+    if not p:
+        return jsonify({'success': False, 'message': 'Pedido no encontrado'}), 404
+    detalles = PedidoDetalle.query.filter_by(pedido_id=p.id).all()
+    detalles_list = [{'id': d.id, 'producto_id': d.producto_id, 'cantidad': int(d.cantidad), 'subtotal': float(d.subtotal)} for d in detalles]
+    return jsonify({'success': True, 'pedido': {
+        'id': p.id,
+        'cliente_id': p.cliente_id,
+        'fecha_pedido': p.fecha_pedido.isoformat() if p.fecha_pedido else None,
+        'estado': p.estado,
+        'prioridad': p.prioridad,
+        'total': float(p.total) if p.total is not None else None,
+        'detalles': detalles_list
+    }})
+
+@app.route('/api/pedidos', methods=['POST'])
+def create_pedido():
+    try:
+        payload = request.get_json()
+        detalles_payload = payload.get('detalles', [])
+        p = Pedido(
+            cliente_id=payload.get('cliente_id'),
+            estado=payload.get('estado', 'pendiente'),
+            prioridad=payload.get('prioridad', 'normal'),
+            total=payload.get('total') or 0
+        )
+        db.session.add(p)
+        db.session.flush()  # obtener id
+        total_calc = 0
+        for d in detalles_payload:
+            pd = PedidoDetalle(
+                pedido_id=p.id,
+                producto_id=d.get('producto_id'),
+                cantidad=d.get('cantidad'),
+                subtotal=d.get('subtotal')
+            )
+            db.session.add(pd)
+            total_calc += float(d.get('subtotal') or 0)
+        p.total = total_calc or p.total
+        db.session.commit()
+        return jsonify({'success': True, 'id': p.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/pedidos/<int:pid>', methods=['PUT'])
+def update_pedido(pid):
+    try:
+        p = Pedido.query.get(pid)
+        if not p:
+            return jsonify({'success': False, 'message': 'Pedido no encontrado'}), 404
+        payload = request.get_json()
+        # actualizar campos simples
+        for field in ['cliente_id','estado','prioridad','total']:
+            if field in payload:
+                setattr(p, field, payload.get(field))
+        # actualizar detalles (opcional): recibir lista completa y reemplazar
+        if 'detalles' in payload:
+            PedidoDetalle.query.filter_by(pedido_id=p.id).delete()
+            total_calc = 0
+            for d in payload['detalles']:
+                pd = PedidoDetalle(
+                    pedido_id=p.id,
+                    producto_id=d.get('producto_id'),
+                    cantidad=d.get('cantidad'),
+                    subtotal=d.get('subtotal')
+                )
+                db.session.add(pd)
+                total_calc += float(d.get('subtotal') or 0)
+            p.total = total_calc
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/pedidos/<int:pid>', methods=['DELETE'])
+def delete_pedido(pid):
+    try:
+        p = Pedido.query.get(pid)
+        if not p:
+            return jsonify({'success': False, 'message': 'Pedido no encontrado'}), 404
+        # eliminar detalles automáticamente por ondelete en modelo si existe, sino:
+        PedidoDetalle.query.filter_by(pedido_id=p.id).delete()
+        db.session.delete(p)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 # =========================
 # ENDPOINTS DE ML Y RUTAS OPTIMIZADO PARA MÚLTIPLES PUNTOS
