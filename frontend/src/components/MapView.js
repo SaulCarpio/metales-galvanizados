@@ -5,46 +5,41 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://192.168.0.21:8080';
 
-// Estilos (sin cambios)
 const MapViewStyles = () => (
-    <style>{`
-      /* ... (todos los estilos anteriores van aquí, sin cambios) ... */
-      .leaflet-custom-icon { display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; font-size: 14px; font-family: sans-serif; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.5); }
-      .start-marker { background-color: #dc3545; } /* Cambiado a rojo para que coincida con la ruta */
-      .waypoint-marker { background-color: #007bff; }
-      .map-controls { position: absolute; top: 10px; left: 10px; background: rgba(255, 255, 255, 0.95); padding: 10px; border-radius: 8px; z-index: 1000; display: flex; gap: 10px; }
-      .btn { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: background-color 0.2s; }
-      .btn:disabled { background-color: #ccc; cursor: not-allowed; }
-      .btn-primary { background: #007bff; color: white; }
-      .btn-primary:hover:not(:disabled) { background: #0056b3; }
-      .btn-active { background: #28a745; color: white; }
-      .btn-active:hover:not(:disabled) { background: #218838; }
-      .btn-secondary { background: #6c757d; color: white; }
-      .btn-secondary:hover:not(:disabled) { background: #5a6268; }
-      .btn-danger { background: #dc3545; color: white; }
-      .btn-danger:hover:not(:disabled) { background: #c82333; }
-      .route-info-panel { position: absolute; top: 10px; right: 10px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 15px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); min-width: 280px; z-index: 1000; }
-      .route-info-panel h3 { margin: 0 0 15px 0; font-size: 16px; color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 8px; }
-      .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
-      .info-row:last-child { border-bottom: none; }
-      .info-label { font-weight: 500; color: #666; }
-      .info-value { font-weight: bold; color: #2196F3; }
-      .map-error { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: #f44336; color: white; padding: 15px 25px; border-radius: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 1000; }
-      .map-loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.95); padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); text-align: center; z-index: 1000; }
-      .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #2196F3; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px; }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    `}</style>
+  <style>{`
+    .leaflet-custom-icon { display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; font-size: 14px; font-family: sans-serif; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.5); }
+    .start-marker { background-color: #dc3545; }
+    .waypoint-marker { background-color: #007bff; }
+    .map-controls { position: absolute; top: 10px; left: 10px; background: rgba(255, 255, 255, 0.95); padding: 10px; border-radius: 8px; z-index: 1000; display: flex; gap: 10px; }
+    .btn { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: background-color 0.2s; }
+    .btn:disabled { background-color: #ccc; cursor: not-allowed; }
+    .btn-primary { background: #007bff; color: white; }
+    .btn-primary:hover:not(:disabled) { background: #0056b3; }
+    .btn-active { background: #28a745; color: white; }
+    .btn-active:hover:not(:disabled) { background: #218838; }
+    .btn-secondary { background: #6c757d; color: white; }
+    .btn-secondary:hover:not(:disabled) { background: #5a6268; }
+    .btn-danger { background: #dc3545; color: white; }
+    .btn-danger:hover:not(:disabled) { background: #c82333; }
+    .route-info-panel { position: absolute; top: 10px; right: 10px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 15px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); min-width: 280px; z-index: 1000; }
+    .route-info-panel h3 { margin: 0 0 15px 0; font-size: 16px; color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 8px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { font-weight: 500; color: #666; }
+    .info-value { font-weight: bold; color: #2196F3; }
+    .map-error { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: #f44336; color: white; padding: 15px 25px; border-radius: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 1000; }
+    .map-loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.95); padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); text-align: center; z-index: 1000; }
+    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #2196F3; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+  `}</style>
 );
 
-// <-- 1. NUEVO: Función auxiliar para calcular el color del degradado
-// Recibe un porcentaje (de 0.0 a 1.0) y devuelve un color entre rojo y azul.
 const getColorForPercentage = (p) => {
   const red = Math.round(255 * (1 - p));
   const blue = Math.round(255 * p);
-  // Devuelve un string de color en formato rgb, por ejemplo: "rgb(255, 0, 0)"
   return `rgb(${red}, 0, ${blue})`;
 };
-
 
 const MapView = ({ initialCoord = null }) => {
   const mapRef = useRef(null);
@@ -70,15 +65,13 @@ const MapView = ({ initialCoord = null }) => {
     mapInstance.current = L.map(mapRef.current).setView(startCoord, 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance.current);
     markersLayer.current = L.layerGroup().addTo(mapInstance.current);
-    
-    // <-- 2. MODIFICACIÓN: Aseguramos que la capa de ruta se inicialice aquí
     routeLayer.current = L.layerGroup().addTo(mapInstance.current);
 
     if (initialCoord) {
       const latlng = L.latLng(initialCoord[0], initialCoord[1]);
       setWaypoints([latlng]);
     }
-    
+
     return () => {
       if (mapInstance.current) {
         mapInstance.current.remove();
@@ -92,9 +85,7 @@ const MapView = ({ initialCoord = null }) => {
     if (!map) return;
     map.on('click', handleMapClick);
     return () => {
-      if (map) {
-        map.off('click', handleMapClick);
-      }
+      map.off('click', handleMapClick);
     };
   }, [handleMapClick]);
 
@@ -118,7 +109,7 @@ const MapView = ({ initialCoord = null }) => {
           iconAnchor: [17, 17],
         });
       }
-      L.marker(point, { icon: icon }).addTo(markersLayer.current);
+      L.marker(point, { icon }).addTo(markersLayer.current);
     });
   }, [waypoints]);
 
@@ -128,10 +119,7 @@ const MapView = ({ initialCoord = null }) => {
     } else {
       setWaypoints([]);
     }
-    // <-- 3. MODIFICACIÓN: Usamos clearLayers para limpiar la ruta
-    if (routeLayer.current) {
-      routeLayer.current.clearLayers();
-    }
+    routeLayer.current?.clearLayers();
     setRouteInfo(null);
     setError(null);
   };
@@ -150,20 +138,15 @@ const MapView = ({ initialCoord = null }) => {
     const waypointsPayload = waypoints.map(wp => [wp.lat, wp.lng]);
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/find-route`, {
-        waypoints: waypointsPayload,
-      });
+      const response = await axios.post(`${API_BASE_URL}/api/find-route`, { waypoints: waypointsPayload });
 
       const latency = Math.round(performance.now() - startTime);
-      if (!response.data.success) throw new Error(response.data.message || 'La respuesta del servidor no fue exitosa');
+      if (!response.data.success) throw new Error(response.data.message || 'Error en la respuesta del servidor');
       
       const routeCoords = response.data.route.coordinates;
       if (!routeCoords || routeCoords.length === 0) throw new Error('No se encontraron coordenadas para la ruta');
 
-      // <-- 4. MODIFICACIÓN PRINCIPAL: Lógica para dibujar la ruta con degradado
-      if (routeLayer.current) {
-        routeLayer.current.clearLayers();
-      }
+      routeLayer.current?.clearLayers();
 
       const totalSegments = routeCoords.length - 1;
       for (let i = 0; i < totalSegments; i++) {
@@ -173,12 +156,11 @@ const MapView = ({ initialCoord = null }) => {
 
         L.polyline(segmentCoords, {
           color: segmentColor,
-          weight: 5, // Un poco más grueso para que el color se aprecie mejor
+          weight: 5,
           opacity: 0.9,
         }).addTo(routeLayer.current);
       }
 
-      // Ajustar el mapa a los límites de la ruta
       const routeBounds = L.latLngBounds(routeCoords);
       mapInstance.current.fitBounds(routeBounds, { padding: [50, 50] });
       
@@ -197,11 +179,16 @@ const MapView = ({ initialCoord = null }) => {
 
   const toggleAddPointsMode = () => setIsAddingPoints(!isAddingPoints);
 
+  // NUEVO: Función para volver a agregar puntos tras calcular una ruta
+  const handleAddMorePoints = () => {
+    setIsAddingPoints(true);
+  };
+
   return (
     <div style={{ position: 'relative', height: '100%', width: '100%' }}>
       <MapViewStyles />
       <div ref={mapRef} style={{ height: '100%', width: '100%', cursor: isAddingPoints ? 'crosshair' : 'grab' }}></div>
-      {/* ... (resto del JSX sin cambios) ... */}
+
       <div className="map-controls">
         <button className={`btn ${isAddingPoints ? 'btn-active' : 'btn-primary'}`} onClick={toggleAddPointsMode}>
           {isAddingPoints ? 'Dejar de Agregar' : 'Agregar Punto'}
@@ -213,6 +200,7 @@ const MapView = ({ initialCoord = null }) => {
           Limpiar
         </button>
       </div>
+
       {routeInfo && (
         <div className="route-info-panel">
           <h3>📍 Información del Viaje</h3>
@@ -222,6 +210,13 @@ const MapView = ({ initialCoord = null }) => {
           <div className="info-row"><span className="info-label">📡 Latencia Total:</span><span className="info-value">{routeInfo.latency} ms</span></div>
         </div>
       )}
+
+      {routeInfo && (
+        <div className="add-more-btn" onClick={handleAddMorePoints}>
+          ➕ Añadir más puntos
+        </div>
+      )}
+
       {error && (<div className="map-error"><p>❌ {error}</p></div>)}
       {loading && (<div className="map-loading"><div className="spinner"></div><p>🔍 Buscando la mejor ruta...</p></div>)}
     </div>
